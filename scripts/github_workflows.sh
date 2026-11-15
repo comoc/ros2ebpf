@@ -28,7 +28,7 @@
 #     tomoyafujita/ros2dev:rolling ./scripts/github_workflows.sh
 #
 # The interactive version of the same build, in the same container, is
-# README section 4 (development container); docs/development.md has the rest.
+# the README demo (development container); docs/development.md has the rest.
 #
 #####################################################################
 

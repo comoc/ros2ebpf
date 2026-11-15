@@ -16,7 +16,7 @@ A mismatch (a Rolling install older or newer than the row) shows up as `ros2ebpf
 
 ## Updating the row
 
-In the development container (README §4), or on any machine with the Rolling installation and a C compiler:
+In the development container (the README demo), or on any machine with the Rolling installation and a C compiler:
 
 ```
 ./gen.sh /ws/install            # or /opt/ros/rolling

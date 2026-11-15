@@ -57,7 +57,7 @@ PASS counters survived daemon restart (13 -> 17)
 e2e: all checks passed
 ```
 
-## 3. Quick check in the development container (README §4)
+## 3. Quick check in the development container (the [README demo](../README.md#demo-talker-listener-and-a-service))
 
 ```bash
 ros2ebpfd --check -c /etc/ros2ebpf/config.yaml

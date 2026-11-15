@@ -24,9 +24,9 @@ Repeat on each host (`main`, `perception`, `arm` …).
 Hosts may run different RMWs and CPU architectures (all on ROS 2 Rolling); each daemon exports what it found in `ros2ebpf_host_info`.
 
 ```bash
-# install: the development container build (README §4), the ros2ebpfd image (docker/Dockerfile, below), or
+# install: the development container build (the README demo), the ros2ebpfd image (docker/Dockerfile, below), or
 # the ros-rolling-ros2ebpf-daemon package once the packages are released to the ROS build farm
-sudo mkdir -p /etc/ros2ebpf && sudo cp install/etc/ros2ebpf/config.example.yaml /etc/ros2ebpf/config.yaml
+sudo mkdir -p /etc/ros2ebpf && sudo cp install/ros2ebpf_daemon/etc/ros2ebpf/config.example.yaml /etc/ros2ebpf/config.yaml
 sudoedit /etc/ros2ebpf/config.yaml
 ```
 
@@ -41,7 +41,7 @@ discover_shims: true
 expectations_file: /etc/ros2ebpf/expectations.yaml         # the file exists on ONE host only (see §2)
 ```
 
-Then, whenever statistics are wanted (the daemon is on demand, see README 4.4):
+Then, whenever statistics are wanted (the daemon is on demand, see [cli.md](cli.md#start-and-privileges)):
 
 ```bash
 ros2 ebpf start                               # detached, through sudo -n; `ros2 ebpf stop` when done
@@ -57,7 +57,7 @@ Do not expose it beyond the robot LAN.
 
 ### Container instead of a package
 
-Same on every host, with Docker/Podman; the flags are those of the development container (README 4.1), and the image is built with `docker build -f docker/Dockerfile -t ros2ebpfd .`:
+Same on every host, with Docker/Podman; the flags are those of the development container of the README demo, and the image is built with `docker build -f docker/Dockerfile -t ros2ebpfd .`:
 
 ```bash
 docker run -d --name ros2ebpfd --restart unless-stopped --pid host --privileged \
@@ -105,7 +105,7 @@ Keep `honor_labels = true` so the exporter's `host` label is not overwritten by 
 The WAL on `/var/lib/alloy` buffers link loss (`max_keepalive_time = "8h"`).
 
 Check on the collector host: `curl -s localhost:12345/-/ready` (Alloy UI on 12345 if enabled), and in Alloy's log that every target is `up`.
-A Prometheus agent (`prometheus --agent`) with the equivalent `scrape_configs` + `remote_write` (README §8) works the same way.
+A Prometheus agent (`prometheus --agent`) with the equivalent `scrape_configs` + `remote_write` works the same way.
 
 ## 3. Central
 
@@ -144,7 +144,7 @@ In Prometheus (`/graph`):
 | `ros2_topic_expected_hz` | one series per robot and topic |
 | `/alerts` | `Ros2ebpfHostDown`, `Ros2ebpfRobotBlind`, `Ros2ebpfProbesMissing` inactive |
 
-In Grafana: folder "ROS 2": fleet → robot → host drill-down; "ros2ebpf daemon health".
+In Grafana: folder "ROS 2": fleet → robot → host drill-down; "ros2ebpf daemon health"; "ROS 2 demo" is the single-host dashboard of the README demo.
 
 ## 4. Operator shell: the CLI across hosts
 

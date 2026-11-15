@@ -25,6 +25,7 @@ configMapGenerator:
     options: {disableNameSuffixHash: true}
   - name: grafana-dashboards
     files:
+      - files/grafana/dashboards/ros2ebpf-demo.json
       - files/grafana/dashboards/ros2ebpf-fleet.json
       - files/grafana/dashboards/ros2ebpf-robot.json
       - files/grafana/dashboards/ros2ebpf-host.json
