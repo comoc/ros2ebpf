@@ -492,6 +492,24 @@ static int handle_rpc(void *ctx, const char *method, struct json_object *params,
         json_object_object_add(*result, "new_shims", json_object_new_int(n));
         return 0;
     }
+    if (!strcmp(method, "reset")) {
+        /* `ros2 ebpf reset`: counters restart from zero, the probes stay attached. Every pid is
+         * re-announced at its next rmw_* call and resolved again (same path as first sight). */
+        int procs = 0;
+        int eps = identity_reset(&d->ident, &procs);
+        struct ros2ebpf_maps m;
+        probes_fill_maps(&d->probes, &m);
+        int drops = identity_map_clear(m.fd[ROS2EBPF_MI_UDP_DROPS], sizeof(struct ros2ebpf_udp_key));
+        char msg[192];
+        snprintf(msg, sizeof(msg), "reset: forgot %d endpoint(s), %d process(es), %d udp port(s); "
+                 "counters restart from zero at the next call", eps, procs, drops < 0 ? 0 : drops);
+        log_info("%s (control socket)", msg);
+        *result = json_object_new_object();
+        json_object_object_add(*result, "message", jstr(msg));
+        json_object_object_add(*result, "endpoints", json_object_new_int(eps));
+        json_object_object_add(*result, "processes", json_object_new_int(procs));
+        return 0;
+    }
     if (!strcmp(method, "stop")) {
         /* `ros2 ebpf stop`: same as SIGTERM, the maps stay pinned. The reply goes out before
          * the loop notices d->stop. */

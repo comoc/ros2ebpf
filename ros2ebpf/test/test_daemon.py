@@ -23,6 +23,7 @@ import textwrap
 import pytest
 
 from ros2ebpf import daemon
+from ros2ebpf.verb.reset import ResetVerb
 from ros2ebpf.verb.start import StartVerb
 from ros2ebpf.verb.stop import StopVerb
 
@@ -61,6 +62,10 @@ FAKE_DAEMON = textwrap.dedent('''\
             elif req['method'] == 'stop':
                 result = {'message': 'stopping'}
                 stop = True
+            elif req['method'] == 'reset':
+                result = {'message': 'reset: forgot 2 endpoint(s), 1 process(es), 0 udp port(s); '
+                                     'counters restart from zero at the next call',
+                          'endpoints': 2, 'processes': 1}
             else:
                 conn.sendall(json.dumps({'jsonrpc': '2.0', 'id': req['id'],
                                          'error': {'code': -32601, 'message': 'unknown'}}).encode() + b'\\n')
@@ -174,3 +179,59 @@ def test_start_verb_errors(fake, capsys):
     assert StartVerb().main(args=_start_args(fake, binary=bad)) == 1
     err = capsys.readouterr().err
     assert 'exited with code 3' in err and 'boom' in err
+
+
+def _reset_args(fake, **kw):
+    ns = argparse.Namespace(socket=fake.socket, config=fake.config, host=[], robot=None, no_sudo=True)
+    vars(ns).update(kw)
+    return ns
+
+
+def test_pin_root(tmp_path):
+    cfg = tmp_path / 'config.yaml'
+    assert daemon.pin_root(str(cfg)) == daemon.DEFAULT_PIN_ROOT        # missing file
+    cfg.write_text('log_level: info\n')
+    assert daemon.pin_root(str(cfg)) == daemon.DEFAULT_PIN_ROOT        # key unset
+    cfg.write_text('pin_root: /sys/fs/bpf/other\n')
+    assert daemon.pin_root(str(cfg)) == '/sys/fs/bpf/other'
+
+
+def test_remove_pins(tmp_path):
+    pins = tmp_path / 'pins'
+    pins.mkdir()
+    (pins / 'endpoints').write_text('')
+    assert daemon.remove_pins(str(pins), sudo=False) is True
+    assert not pins.exists()
+    assert daemon.remove_pins(str(pins), sudo=False) is False           # nothing there: not an error
+    for bad in ('/', '/sys', 'relative/path'):
+        with pytest.raises(ValueError):
+            daemon.remove_pins(bad, sudo=False)
+
+
+def test_reset_verb_with_daemon(fake, capsys):
+    assert StartVerb().main(args=_start_args(fake)) == 0
+    capsys.readouterr()
+    try:
+        assert ResetVerb().main(args=_reset_args(fake)) == 0
+        out = capsys.readouterr().out
+        assert 'forgot 2 endpoint(s), 1 process(es)' in out
+    finally:
+        StopVerb().main(args=argparse.Namespace(socket=fake.socket, timeout=10.0))
+
+
+def test_reset_verb_without_daemon(fake, tmp_path, capsys):
+    pins = tmp_path / 'pins'
+    pins.mkdir()
+    (pins / 'endpoints').write_text('')
+    cfg = tmp_path / 'reset.yaml'
+    cfg.write_text(f'pin_root: {pins}\n')
+    assert daemon.status(fake.socket) is None
+    assert ResetVerb().main(args=_reset_args(fake, config=str(cfg))) == 0
+    out = capsys.readouterr().out
+    assert 'not running' in out and f'removed the pinned maps under {pins}' in out
+    assert not pins.exists()
+    assert ResetVerb().main(args=_reset_args(fake, config=str(cfg))) == 0
+    assert 'nothing pinned' in capsys.readouterr().out
+    # --host selects remote targets only: no local fallback, the connection error is reported
+    assert ResetVerb().main(args=_reset_args(fake, host=[f'unix://{fake.socket}'])) == 1
+    assert 'error' in capsys.readouterr().err

@@ -221,8 +221,11 @@ docker run -d --name grafana --network host -e GF_SECURITY_ADMIN_PASSWORD=admin 
 [deploy/prometheus/prometheus-local.yml](deploy/prometheus/prometheus-local.yml) scrapes the daemon every 5 s at `localhost:9477` with the label `robot="bench-01"` and loads the alert rules of `deploy/prometheus/rules/ros2.yaml`.
 The provisioned Grafana datasource takes Prometheus from `PROMETHEUS_URL`: `localhost:9090` here, the `prometheus` service in the central manifests.
 
-- <http://localhost:9090/targets>: `ros2ebpf` is `UP`; query `rate(ros2_rmw_publish_total[1m])` while the talker runs.
-- <http://localhost:3000> (admin / admin), Dashboards, folder **ROS 2**, **"ROS 2 demo"**: publish and take rate of `/chatter` per process, requests and responses of `/add_two_ints` per side, and the process table.
+Open them from any machine that reaches the host: `<host>` is the IP address or hostname of the machine running the containers, or `localhost` when the browser runs there too.
+Both ports listen on every interface with no authentication beyond Grafana's `admin / admin`, so keep this on a trusted network.
+
+- `http://<host>:9090/targets`: `ros2ebpf` is `UP`; query `rate(ros2_rmw_publish_total[1m])` while the talker runs.
+- `http://<host>:3000` (admin / admin), Dashboards, folder **ROS 2**, **"ROS 2 demo"**: publish and take rate of `/chatter` per process, requests and responses of `/add_two_ints` per side, and the process table.
   The panels take 30 s to fill after the nodes start.
 
 The other dashboards of the folder ("ROS 2 fleet", "ROS 2 robot", "ROS 2 host", "ros2ebpf daemon health") and the alert rules are for the multi-host layout of [docs/deployment.md](docs/deployment.md).
@@ -231,8 +234,8 @@ The other dashboards of the folder ("ROS 2 fleet", "ROS 2 robot", "ROS 2 host", 
 
 ```bash
 kill %1 %2 %3 %4                      # second shell: the demo nodes
-ros2 ebpf stop                        # counters stay in the pinned maps; the next `ros2 ebpf start` continues them
-rm -rf /sys/fs/bpf/ros2ebpf           # forget the counters too
+ros2 ebpf reset                       # forget the counters; without it the next `ros2 ebpf start` continues them
+ros2 ebpf stop
 docker rm -f prometheus grafana       # on the host
 ```
 

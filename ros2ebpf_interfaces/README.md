@@ -34,6 +34,7 @@ Errors use the JSON-RPC error object with codes `-32700` (parse), `-32600` (inva
 | `config` | none | effective configuration (same keys as `config.yaml`) plus `path` |
 | `metrics` | none | `{text}`: the Prometheus exposition the exporter would serve |
 | `discover` | none | `{new_shims}`: run one shim discovery pass now |
+| `reset` | none | `{message, endpoints, processes}`: every endpoint, process and udp-drop entry is deleted while the probes stay attached; counters restart from zero at the next call and every pid is re-announced (what `ros2 ebpf reset` sends; Prometheus sees a counter reset) |
 | `stop` | none | `{message}`: the daemon exits after replying (what `ros2 ebpf stop` sends); the maps stay pinned |
 
 The schemas in this directory (`request.schema.json`, `status.schema.json`) are the contract the CLI tests against.

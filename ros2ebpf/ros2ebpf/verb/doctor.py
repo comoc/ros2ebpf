@@ -15,9 +15,11 @@
 """
 `ros2 ebpf doctor`: local preflight checks that need no running daemon.
 
-Reports what would fail at attach time: kernel version, BTF, bpffs,
-capabilities, the shim(s) from config.yaml and their exported symbols, and
-whether the daemon and the exporter endpoint answer.
+Reports what would fail at attach time: kernel version, BTF, bpffs, the pid
+namespace, capabilities, the shim(s) from config.yaml and their exported
+symbols, and whether the daemon and the exporter endpoint answer.
+When the daemon answers, its own metrics are read as well: a daemon that sees
+endpoints but resolves no process identity is not in the host pid namespace.
 """
 
 import os
@@ -41,6 +43,7 @@ REQUIRED_SYMBOLS = (
     'rmw_get_implementation_identifier',
 )
 CAP_SYS_ADMIN, CAP_SYS_PTRACE, CAP_PERFMON, CAP_BPF = 21, 19, 38, 39
+PROC_PID_INIT_INO = 0xEFFFFFFC  # include/linux/proc_ns.h: inode of the initial pid namespace
 
 
 def elf_dynamic_symbols(path):
@@ -90,6 +93,28 @@ def effective_caps():
     return 0
 
 
+def in_host_pid_namespace(path='/proc/self/ns/pid'):
+    """True in the initial pid namespace, False in a container's own one, None if unreadable."""
+    try:
+        return os.stat(path).st_ino == PROC_PID_INIT_INO
+    except OSError:
+        return None
+
+
+def self_metric(body, name, **labels):
+    """Value of the first `name` sample in a Prometheus exposition whose labels include `labels`."""
+    for line in body.splitlines():
+        if not (line.startswith(name + '{') or line.startswith(name + ' ')):
+            continue
+        series, _, value = line.rpartition(' ')
+        if all(f'{k}="{v}"' in series for k, v in labels.items()):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+    return None
+
+
 def bpffs_mounted(path='/sys/fs/bpf'):
     try:
         with open('/proc/mounts') as f:
@@ -120,6 +145,13 @@ class DoctorVerb(VerbExtension):
             else 'missing: kernel built without CONFIG_DEBUG_INFO_BTF; CO-RE cannot work')
         rep('PASS' if bpffs_mounted() else 'FAIL', 'bpffs on /sys/fs/bpf',
             '' if bpffs_mounted() else 'mount -t bpf bpf /sys/fs/bpf')
+        ns = in_host_pid_namespace()
+        if ns is None:
+            rep('WARN', 'pid namespace', '/proc/self/ns/pid unreadable')
+        else:
+            rep('PASS' if ns else 'FAIL', 'pid namespace',
+                'host' if ns else 'not the host pid namespace: the probes report host pids and ros2ebpfd '
+                'cannot resolve them through /proc; run the container with --pid host (hostPID: true)')
 
         caps = effective_caps()
         if os.geteuid() == 0 or caps & (1 << CAP_SYS_ADMIN):
@@ -187,6 +219,16 @@ class DoctorVerb(VerbExtension):
                         body = r.read().decode()
                     n = sum(1 for line in body.splitlines() if line and not line.startswith('#'))
                     rep('PASS', f'exporter {url}', f'{n} samples')
+                    endpoints = self_metric(body, 'ros2ebpf_map_entries', map='endpoints')
+                    processes = self_metric(body, 'ros2ebpf_map_entries', map='processes')
+                    failures = self_metric(body, 'ros2ebpf_identity_resolve_failures_total') or 0
+                    if endpoints and processes == 0 and failures:
+                        rep('FAIL', 'daemon identity',
+                            f'{int(endpoints)} endpoint(s) seen but no process resolved '
+                            f'({int(failures)} failures): ros2ebpfd is not in the host pid namespace '
+                            '(--pid host / hostPID: true); no ros2_* series are exported until it is')
+                    elif endpoints is not None and processes is not None:
+                        rep('PASS', 'daemon identity', f'{int(processes)} process(es), {int(endpoints)} endpoint(s)')
                 except Exception as e:
                     rep('FAIL', f'exporter {url}',
                         f"{e} (running in a container? the port belongs to the daemon's network namespace)")

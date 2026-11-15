@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Run `ros2 ebpf doctor` first: it checks the kernel, BTF, bpffs, capabilities, the shim symbols, the daemon and the exporter, one PASS / INFO / FAIL line each.
+Run `ros2 ebpf doctor` first: it checks the kernel, BTF, bpffs, the pid namespace, capabilities, the shim symbols, the daemon, the exporter and whether the daemon resolves process identity, one PASS / INFO / FAIL line each.
 Then:
 
 | Symptom | Cause / fix |

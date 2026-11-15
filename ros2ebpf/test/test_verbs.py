@@ -24,7 +24,9 @@ from ros2ebpf.verb.config import ConfigVerb
 from ros2ebpf.verb.config import get_path
 from ros2ebpf.verb.config import set_path
 from ros2ebpf.verb.doctor import elf_dynamic_symbols
+from ros2ebpf.verb.doctor import in_host_pid_namespace
 from ros2ebpf.verb.doctor import REQUIRED_SYMBOLS
+from ros2ebpf.verb.doctor import self_metric
 from ros2ebpf.verb.status import StatusVerb
 
 
@@ -108,3 +110,26 @@ def test_elf_parser_on_shim():
         if os.path.exists(p):
             syms = elf_dynamic_symbols(p)
             assert all(s in syms for s in REQUIRED_SYMBOLS)
+
+
+def test_in_host_pid_namespace(tmp_path):
+    f = tmp_path / 'ns'
+    f.write_text('')
+    assert in_host_pid_namespace(str(f)) is False          # a regular file never has the init namespace inode
+    assert in_host_pid_namespace(str(tmp_path / 'missing')) is None
+    assert in_host_pid_namespace() in (True, False)        # /proc/self/ns/pid is always readable on Linux
+
+
+def test_self_metric():
+    body = ('# HELP ros2ebpf_map_entries Entries per pinned map.\n'
+            '# TYPE ros2ebpf_map_entries gauge\n'
+            'ros2ebpf_map_entries{host="a",map="endpoints"} 6\n'
+            'ros2ebpf_map_entries{host="a",map="processes"} 0\n'
+            'ros2ebpf_identity_resolve_failures_total{host="a"} 131\n'
+            'ros2ebpf_scrape_duration_seconds 0.001\n')
+    assert self_metric(body, 'ros2ebpf_map_entries', map='endpoints') == 6
+    assert self_metric(body, 'ros2ebpf_map_entries', map='processes') == 0
+    assert self_metric(body, 'ros2ebpf_identity_resolve_failures_total') == 131
+    assert self_metric(body, 'ros2ebpf_scrape_duration_seconds') == 0.001
+    assert self_metric(body, 'ros2ebpf_map_entries', map='udp_drops') is None
+    assert self_metric(body, 'ros2ebpf_map') is None       # prefix of a name is not a match

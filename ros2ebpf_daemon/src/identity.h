@@ -20,5 +20,11 @@ int identity_sweep_pid(struct identity *id, __u32 pid);
 void identity_gc(struct identity *id);
 /* Fill `domains` with distinct domain ids in the processes map; returns count. */
 int identity_domains_seen(struct identity *id, __u32 *domains, int max);
+/* Delete every entry of a hash map whose keys are key_size bytes; returns the number deleted or -errno. */
+int identity_map_clear(int fd, size_t key_size);
+/* `reset`: forget every endpoint and process while the probes stay attached. Counters restart
+ * from zero at the next rmw_* call, and every pid is re-announced and resolved again.
+ * Returns the number of endpoints removed; *processes gets the number of processes removed. */
+int identity_reset(struct identity *id, int *processes);
 
 #endif

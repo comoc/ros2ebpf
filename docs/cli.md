@@ -16,11 +16,12 @@ Every verb works locally through `/run/ros2ebpf/control.sock`, or against other 
 | `status [-v] [-q]` | health table; exit 1 if any configured family is not fully attached (readiness check) |
 | `enable <family>` / `disable <family>` | attach / detach `publish`, `take`, `services`, `udp_drops`; counters kept |
 | `reload` | re-read config.yaml + expectations.yaml, no detach |
+| `reset [-c FILE] [--no-sudo]` | forget every endpoint, process and drop counter while the probes stay attached; counters restart from zero at the next call (a counter reset for Prometheus); with no daemon running, removes the pinned maps under `pin_root` of the config instead (through `sudo -n` when not root) |
 | `monitor [--interval S] [--view endpoints\|processes\|health] [--filter F] [--once] [--no-color]` | full-screen terminal view, no Prometheus or browser needed: endpoint rates with sparklines, processes, daemon health; `e`/`p`/`h` switch views, `/` filters, `s` sorts, `?` help, `q` quits; `--once` prints one plain frame |
 | `top [--topic T] [--domain D] [--kind K] [--interval S] [--once]` | live rates from two map reads (bench tool); for `client` and `service` rows `Hz` is requests and `Hz(2nd)` is responses |
 | `config show \| get KEY \| set KEY VALUE [--no-reload] \| keys` | edit the config file with validation, then reload |
 | `expectations capture [--duration S] [--takers] [-o FILE] \| show` | write expectations.yaml from observed rates |
-| `doctor [--config F] [--shim P]` | kernel, BTF, bpffs, capabilities, shim symbols, daemon, exporter |
+| `doctor [--config F] [--shim P]` | kernel, BTF, bpffs, pid namespace, capabilities, shim symbols, daemon, exporter, and whether the daemon resolves process identity |
 | `metrics [--grep S]` | the exposition, through the control socket (works in `external` mode too) |
 
 ## `start` and privileges
@@ -55,7 +56,7 @@ ros2 ebpf disable udp_drops                          # detach a family at runtim
 ros2 ebpf expectations capture --duration 60 --takers -o /tmp/expectations.yaml   # then copy to /etc/ros2ebpf
 ros2 ebpf reload                                     # re-read config.yaml / expectations.yaml (or SIGHUP)
 ros2 ebpf stop && ros2 ebpf start                    # counters survive: maps are pinned in bpffs
-ros2 ebpf stop && sudo rm -rf /sys/fs/bpf/ros2ebpf && ros2 ebpf start   # reset counters
+ros2 ebpf reset                                      # counters restart from zero, probes stay attached (also with the daemon stopped: removes the pinned maps)
 ```
 
 Debug logging at runtime: `ros2 ebpf config set log_level debug`.

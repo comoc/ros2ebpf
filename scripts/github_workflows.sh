@@ -255,6 +255,14 @@ function end_to_end () {
     after=$(val 'ros2_rmw_publish_total{host="e2e",domain_id="'${ROS_DOMAIN_ID}'",comm="talker",topic="/chatter"}')
     if [ "${after:-0}" -ge "${before:-1}" ]; then echo "PASS counters survived daemon restart ($before -> $after)"; else echo "FAIL counters reset on restart ($before -> $after)"; fail=1; fi
 
+    # reset through the control socket: counters restart from zero, probes stay attached, pids are re-resolved
+    before=$(val 'ros2_rmw_publish_total{host="e2e",domain_id="'${ROS_DOMAIN_ID}'",comm="talker",topic="/chatter"}')
+    ./install/bin/ros2ebpf-ctl -s /tmp/r2e.sock reset > /dev/null; sleep 2
+    after=$(val 'ros2_rmw_publish_total{host="e2e",domain_id="'${ROS_DOMAIN_ID}'",comm="talker",topic="/chatter"}')
+    if [ -n "$after" ] && [ "$after" -lt "${before:-0}" ]; then echo "PASS reset: counters restarted from zero ($before -> $after)"; else echo "FAIL reset ($before -> $after)"; fail=1; fi
+    check "process identity resolved again after reset"  "^ros2_process_info\{host=\"e2e\",comm=\"talker\",pid=\"[0-9]+\",domain_id=\"${ROS_DOMAIN_ID}\""
+    ./install/bin/ros2ebpf-ctl -s /tmp/r2e.sock status -q && echo "PASS status healthy after reset" || { echo "FAIL healthy after reset"; fail=1; }
+
     # the CLI against the running daemon
     ROS2EBPF_SOCKET=/tmp/r2e.sock ros2 ebpf status
     ROS2EBPF_SOCKET=/tmp/r2e.sock ros2 ebpf top --once

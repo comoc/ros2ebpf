@@ -26,6 +26,8 @@ import signal
 import subprocess
 import time
 
+import yaml
+
 from ros2ebpf.api import ConnectError
 from ros2ebpf.api import DEFAULT_SOCKET
 from ros2ebpf.api import RpcError
@@ -33,6 +35,7 @@ from ros2ebpf.api import UnixClient
 
 DAEMON_BINARY = 'ros2ebpfd'
 DEFAULT_CONFIG = '/etc/ros2ebpf/config.yaml'
+DEFAULT_PIN_ROOT = '/sys/fs/bpf/ros2ebpf'
 
 
 def default_log_file():
@@ -61,6 +64,37 @@ def daemon_argv(binary, config, log_level=None, sudo=None):
     if sudo:
         argv = ['sudo', '-n', '--'] + argv
     return argv
+
+
+def pin_root(config=DEFAULT_CONFIG):
+    """``pin_root`` of a config file; the default when the key is unset or the file unreadable."""
+    try:
+        with open(config) as f:
+            cfg = yaml.safe_load(f) or {}
+        return (cfg.get('pin_root') if isinstance(cfg, dict) else None) or DEFAULT_PIN_ROOT
+    except (OSError, yaml.YAMLError):
+        return DEFAULT_PIN_ROOT
+
+
+def remove_pins(path, sudo=None):
+    """
+    Remove the pinned maps directory (``ros2 ebpf reset`` with no daemon running).
+
+    Through ``sudo -n`` when not root. Returns True when something was removed, False when
+    nothing was pinned there. Refuses anything that is not an absolute path with a parent.
+    """
+    path = os.path.normpath(path)
+    if not os.path.isabs(path) or os.path.dirname(path) in ('', '/'):
+        raise ValueError(f'refusing to remove {path!r}')
+    if not os.path.isdir(path):
+        return False
+    if sudo is None:
+        sudo = os.geteuid() != 0
+    if sudo:
+        subprocess.run(['sudo', '-n', '--', 'rm', '-rf', '--one-file-system', path], check=True)
+    else:
+        shutil.rmtree(path)
+    return True
 
 
 def status(socket_path=DEFAULT_SOCKET):

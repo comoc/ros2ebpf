@@ -199,6 +199,43 @@ int identity_sweep_pid(struct identity *id, __u32 pid)
     return n;
 }
 
+int identity_map_clear(int fd, size_t key_size)
+{
+    if (fd < 0 || key_size == 0 || key_size > 64)
+        return -EINVAL;
+    unsigned char keys[256][64];
+    unsigned char cur[64];
+    int deleted = 0;
+    /* collect a batch, delete it, start over: deleting while iterating restarts the walk, and
+     * the probes may add entries meanwhile (bounded: 1024 rounds > map capacity) */
+    for (int round = 0; round < 1024; round++) {
+        int n = 0;
+        void *pk = NULL;
+        while (n < 256 && bpf_map_get_next_key(fd, pk, keys[n]) == 0) {
+            memcpy(cur, keys[n], key_size);
+            pk = cur;
+            n++;
+        }
+        for (int i = 0; i < n; i++)
+            if (bpf_map_delete_elem(fd, keys[i]) == 0)
+                deleted++;
+        if (n < 256)
+            break;
+    }
+    return deleted;
+}
+
+int identity_reset(struct identity *id, int *processes)
+{
+    int n = identity_map_clear(id->endpoints_fd, sizeof(struct ros2ebpf_endpoint_key));
+    identity_map_clear(id->info_fd, sizeof(struct ros2ebpf_endpoint_key));
+    int p = identity_map_clear(id->processes_fd, sizeof(__u32));
+    identity_map_clear(id->seen_fd, sizeof(__u32));
+    if (processes)
+        *processes = p < 0 ? 0 : p;
+    return n < 0 ? 0 : n;
+}
+
 static int pid_alive(__u32 pid)
 {
     char path[64];

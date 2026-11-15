@@ -83,7 +83,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "-q") || !strcmp(argv[i], "--quiet"))
             quiet = 1;
         else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
-            fprintf(stderr, "usage: %s [-s SOCKET] [-q] <status|enable|disable|reload|snapshot|config|metrics|discover|rpc> [family|json]\n", argv[0]);
+            fprintf(stderr, "usage: %s [-s SOCKET] [-q] <status|enable|disable|reload|snapshot|config|metrics|discover|reset|rpc> [family|json]\n", argv[0]);
             return 0;
         } else
             break;
