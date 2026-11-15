@@ -281,6 +281,8 @@ The view model (`ros2ebpf/monitor.py`) has no terminal code and is unit-tested; 
 Label contract: `robot` (collector) and `host` (daemon) on everything; `domain_id` and `comm` on all endpoint series; `topic` / `service` fully expanded as seen by rmw; `rmw` optional (off by default, cardinality).
 **No `pid` and no `machine_id` on counters**: both live in `_info` series and are joined with `group_left`.
 Endpoints sharing a label set (two publishers of one topic in one process, two processes with the same `comm`) are summed by the exporter.
+Counters live with the endpoint, by design: `rmw_destroy_*` removes the entry, so a destroyed publisher's series disappears at the next scrape instead of lingering at its last value.
+A client that is created, used once and destroyed (a one-shot `add_two_ints_client`) therefore leaves no series behind; the server side of the same call is the durable record.
 
 | Metric | Type | Source |
 |--------|------|--------|
@@ -478,8 +480,6 @@ Cost is per host and does not grow with the number of hosts on the domain; serie
 7. **Exporter sinks**: Prometheus text only in phase 1; OTLP push and a ROS topic sink are the motivating cases for the external exporter mode.
 8. Linux-only; `CAP_BPF` + `CAP_PERFMON` (+ `CAP_SYS_PTRACE` for identity); containerised nodes need the shim resolved through `/proc/<pid>/root`.
 9. Offsets are ABI, not API; the per-architecture table checked against mainline in CI and the runtime identifier check are the mitigation until a stable hook exists.
-10. **Short-lived endpoints**: counters live with the endpoint.
-    A client that is created, used once and destroyed (e.g. a one-shot `add_two_ints_client`) leaves no series behind; the server side of the same call is the durable record.
 
 ## 12. Implications for ROS 2 mainline
 

@@ -69,6 +69,8 @@ flowchart TB
 Every `rmw_*` entry point receives a public handle whose first fields are `{implementation_identifier, data, topic_name|service_name}`.
 The probe reads the name once per handle, keys counters by `(pid, handle)`, and the exporter joins them with per-process identity (`comm`, `domain_id`, container) at scrape time.
 Per-robot identity (`robot=`) is added by the collector (Grafana Alloy / Prometheus agent) on `remote_write`.
+Counters live with the endpoint: a destroyed publisher's series disappears, and the server side of a one-shot client is the durable record of the call.
+The daemon runs on request, not permanently: while it runs every probed `rmw_*` call pays the BPF program (the cost model is in [docs/design.md](docs/design.md#10-cost-model)), so it is started when statistics are wanted and stopped when they are not.
 
 Components:
 
@@ -259,8 +261,6 @@ docker run --rm --privileged --pid host -v "$PWD":/src:ro -w /src tomoyafujita/r
 
 - Intra-process publishes (all subscribers in the same process) bypass `rmw_publish` and are not counted.
 - Sequence-gap tracking needs an RMW that fills `publication_sequence_number` (Fast DDS, Connext) and is exact only for single-publisher topics.
-- Endpoint counters live with the endpoint: a destroyed publisher's series disappears.
-- The daemon is meant to run on request, not permanently: while it runs every probed `rmw_*` call pays the BPF program.
 
 The full list, with the phase-2 plans and the cost model: [docs/design.md](docs/design.md#11-known-limitations--phase-2).
 
