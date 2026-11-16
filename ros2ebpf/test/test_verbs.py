@@ -15,6 +15,7 @@
 import argparse
 import ctypes.util
 import os
+import re
 
 import pytest
 import yaml
@@ -27,7 +28,19 @@ from ros2ebpf.verb.doctor import elf_dynamic_symbols
 from ros2ebpf.verb.doctor import in_host_pid_namespace
 from ros2ebpf.verb.doctor import REQUIRED_SYMBOLS
 from ros2ebpf.verb.doctor import self_metric
+from ros2ebpf.verb.doctor import SUPPORTED_DISTROS
 from ros2ebpf.verb.status import StatusVerb
+
+
+OFFSETS_C = os.path.join(os.path.dirname(__file__), '..', '..', 'ros2ebpf_daemon', 'src', 'offsets.c')
+
+
+@pytest.mark.skipif(not os.path.exists(OFFSETS_C), reason='ros2ebpf_daemon sources not next to this package')
+def test_supported_distros_match_offset_table():
+    # doctor looks for shims under /opt/ros/<distro> of exactly the distros the daemon has a row for
+    with open(OFFSETS_C) as f:
+        rows = re.findall(r'\{\s*"([a-z]+)",\s*"[a-z0-9_]+",\s*\d+,\s*\d+\s*\}', f.read())
+    assert rows and sorted(set(rows)) == sorted(SUPPORTED_DISTROS)
 
 
 def test_config_paths():
