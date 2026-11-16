@@ -28,6 +28,7 @@ ros2_process_info{host="main",robot="amr-07",comm="talker",pid="4211",domain_id=
   - [Contents](#contents)
   - [How it works](#how-it-works)
   - [Requirements](#requirements)
+  - [Branches](#branches)
   - [Demo: talker, listener and a service](#demo-talker-listener-and-a-service)
     - [Start the container](#start-the-container)
     - [Build](#build)
@@ -98,6 +99,17 @@ Development happens on the `rolling` branch; fixes are backported here.
 ROS 2 lives inside the containers: the Lyrical source build of the demo below (the ROS 2 application and ros2ebpf in one container, or in sibling containers in the host pid namespace, which is also what the Kubernetes DaemonSet does).
 Nothing from ROS is installed on the host, and a shim of any distro other than Lyrical and Rolling is refused by the daemon.
 `ros2 ebpf doctor` prints all of this for the host it runs on.
+
+## Branches
+
+| Branch | ROS 2 | |
+|---|---|---|
+| `rolling` | Rolling | default and development branch; pull requests go here |
+| `lyrical` | Lyrical and Rolling | release branch for ROS 2 Lyrical; takes fixes from `rolling` by backport |
+| `main` | Rolling | read-only mirror of `rolling` |
+
+Use `lyrical` for Lyrical and `rolling` for Rolling; `lyrical` also accepts Rolling shims, for hosts that run both.
+Changes land on `rolling` first and are backported to `lyrical` with `git cherry-pick -x`; what is backported and what is not: [docs/development.md](docs/development.md#branches).
 
 ## Demo: talker, listener and a service
 
