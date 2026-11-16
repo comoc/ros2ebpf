@@ -7,6 +7,7 @@ Design note, rev. 4 — 2026-11-04.
 - rev. 3 (2026-11-04): restructured around the project's components — `ros2 ebpf` CLI, `ros2ebpfd` daemon, statistics exporter (placement decided in §5), Prometheus / Alertmanager — with repository layout, interfaces between components, and the deployment procedures (hosts and Kubernetes).
 - rev. 4 (2026-11-04): implementation notes (§13) recording where the first implementation deviates from or refines rev. 3, after the end-to-end run against ROS 2 nodes in a container.
 - rev. 5 (2026-11-14): ROS 2 Rolling only (#15): one offset table row per architecture, checked against mainline in CI; a shim of another distro is refused; everything builds and runs in containers on Ubuntu 26.04.
+- rev. 6 (2026-11-16), `lyrical` branch: ROS 2 Lyrical and Rolling, one offset table row per (distro, architecture), each distro checked against its `rmw` in its own CI job; a source build is Lyrical unless `shims[].distro` says otherwise.
 
 ## 1. Motivation
 
@@ -63,7 +64,7 @@ Correlation scope: **(robot, domain_id)**.
 flowchart LR
     subgraph robot["Robot (x10): several hosts, one or more domains"]
         direction TB
-        subgraph hostA["Host A: main computer (x86_64, Rolling, rmw_fastrtps)"]
+        subgraph hostA["Host A: main computer (x86_64, Lyrical, rmw_fastrtps)"]
             direction TB
             subgraph procA["ROS 2 processes (unmodified)"]
                 nodeA["rclcpp / rclpy node"] --> rclA["librcl.so"]
@@ -84,7 +85,7 @@ flowchart LR
             mapsA --> expA
             identA --> expA
         end
-        subgraph hostB["Host B: perception (aarch64, Rolling, rmw_cyclonedds)"]
+        subgraph hostB["Host B: perception (aarch64, Lyrical, rmw_cyclonedds)"]
             direction TB
             procB["ROS 2 processes"] -.-> kernelB["kernel B: uprobes + maps"]
             kernelB --> daemonB["ros2ebpfd (host B)<br/>/metrics"]
@@ -117,7 +118,7 @@ ros2ebpf/
 ├── ros2ebpf_daemon/           # ros2ebpfd (C, libbpf, CMake; no ROS dependency)
 │   ├── bpf/                   # BPF C programs: rmw_probes.bpf.c, udp_drops.bpf.c, vmlinux_min.h
 │   ├── src/                   # loader (probes.c), identity, control socket, config, offsets, main, ros2ebpf-ctl
-│   ├── offsets/               # struct offset table tooling (gen.sh): rolling/<arch> rows
+│   ├── offsets/               # struct offset table tooling (gen.sh): <distro>/<arch> rows
 │   └── config/                # config.example.yaml, expectations.example.yaml
 ├── ros2ebpf_exporter/         # map reader + Prometheus exposition (C library + ros2ebpf-exporter binary)
 │   └── include/ros2ebpf/maps.h   # THE map contract shared by BPF, daemon and exporter
@@ -128,7 +129,7 @@ ros2ebpf/
 │   ├── prometheus/            # rules/ros2.yaml, alertmanager.yml, prometheus.yml (central), prometheus-local.yml (one host)
 │   └── grafana/               # provisioning + dashboards: fleet, robot, host, daemon health
 ├── docker/                    # Dockerfile: the ros2ebpfd image of the Kubernetes DaemonSet
-├── scripts/github_workflows.sh  # CI: rolling source build, tests, end-to-end
+├── scripts/github_workflows.sh  # CI: lyrical and rolling source builds, tests, end-to-end
 └── docs/
 ```
 
@@ -309,7 +310,7 @@ See `docs/metrics.md` for the full reference with PromQL examples.
 host: ""                      # empty = kernel hostname
 robot: ""                     # optional fallback; normally set by the collector's external label
 shims:
-  - path: /opt/ros/rolling/lib/librmw_implementation.so   # or the one of a Rolling source build
+  - path: /opt/ros/lyrical/lib/librmw_implementation.so   # or /opt/ros/rolling/..., or the one of a source build (distro: rolling for Rolling)
 discover_shims: true          # also find shims used by containers through /proc/<pid>/maps
 identity:
   read_environ: true          # needs CAP_SYS_PTRACE; otherwise domain_id="unknown"
@@ -415,7 +416,7 @@ The full procedures, including the multi-host robot setup, are in `README.md` an
 
 - Linux ≥ 5.8 (`CAP_BPF`, ring buffer), BTF available (`/sys/kernel/btf/vmlinux`) for CO-RE and `tp_btf` tracepoints; the `ros2 ebpf doctor` verb checks this.
 - bpffs mounted at `/sys/fs/bpf`.
-- ROS 2 Rolling, binaries (`/opt/ros/rolling`) or a source build; the offset table row for the architecture is checked against mainline `rmw` in CI (`ros2ebpf_daemon/offsets/gen.sh`), and a shim of any other distro is refused.
+- ROS 2 Lyrical or Rolling, binaries (`/opt/ros/lyrical`, `/opt/ros/rolling`) or a source build; the offset table rows of both distros are checked against their `rmw` in CI (`ros2ebpf_daemon/offsets/gen.sh`), and a shim of any other distro is refused.
 - Capabilities for `ros2ebpfd`: `CAP_BPF`, `CAP_PERFMON`, `CAP_SYS_PTRACE` (identity), and `CAP_SYS_RESOURCE` if the map memlock limit is raised.
   Running as root is the simple alternative; never as a ROS user.
 
@@ -426,7 +427,7 @@ Probing costs a little on every `rmw_*` call (§10), and the use cases are inves
 So the daemon is started and stopped by request, the way `ros2 daemon` is:
 
 ```
-sudo apt install ros-rolling-ros2ebpf-daemon                     # build farm package once released; or a colcon build
+sudo apt install ros-lyrical-ros2ebpf-daemon                     # build farm package once released; or a colcon build
 ros2 ebpf doctor                                                  # kernel, bpffs, shim, offsets
 sudo editor /etc/ros2ebpf/config.yaml                             # robot name, shims, probes
 ros2 ebpf start                                                   # detached, via sudo -n; log in ~/.ros/log/ros2ebpfd.log
@@ -446,7 +447,7 @@ Pinned maps survive stop/start, so counters do not reset.
 
 ### 9.4 Verifying an installation
 
-1. `ros2 ebpf status` on each host: all configured probe families attached, offset table `rolling/<arch>`, exporter mode `inprocess`, identity shows the expected `robot`.
+1. `ros2 ebpf status` on each host: all configured probe families attached, offset table `lyrical/<arch>` (or `rolling/<arch>`), exporter mode `inprocess`, identity shows the expected `robot`.
 2. `curl host:9477/metrics`: `ros2ebpf_host_info` present with correct `machine_id`; `ros2_process_info` lists the running nodes with non-`unknown` `domain_id`.
 3. Central Prometheus: `up{job="ros2ebpf"}` is 1 for every host of every robot; the `Ros2ebpfProbesMissing` and `Ros2ebpfHostDown` alerts are inactive.
 4. Grafana "ROS 2 fleet" dashboard shows publish rates per `(robot, host, topic)`; stop one talker and watch `Ros2TopicRateLow` fire for that robot within ~90 s.

@@ -226,14 +226,16 @@ static int find_rejected(const struct probes *p, dev_t dev, ino_t ino)
     return 0;
 }
 
-/* The distro of a shim comes from where the process sees it (offsets_resolve_distro):
- * <distro> under /opt/ros/, ROS2EBPF_DISTRO for anything else (the colcon install/ of a
- * source build). A distro without a row in the offset table is refused. `seen_path` is the
+/* The distro of a shim is shims[].distro when the config names it, otherwise it comes from
+ * where the process sees it (offsets_resolve_distro): <distro> under /opt/ros/,
+ * ROS2EBPF_DISTRO for anything else (the colcon install/ of a source build, so a Rolling
+ * source build needs `distro: rolling`). A distro without a row in the offset table is refused. `seen_path` is the
  * path as the process sees it: for a discovered shim the in-container path, not
  * /proc/<pid>/root/<path>. */
 static int resolve_shim_offsets(struct shim *s, const char *seen_path, const char *host_arch)
 {
-    offsets_resolve_distro(seen_path, s->distro, sizeof(s->distro));
+    if (!s->distro[0])
+        offsets_resolve_distro(seen_path, s->distro, sizeof(s->distro));
     if (!s->arch[0])
         snprintf(s->arch, sizeof(s->arch), "%s", host_arch);
     s->off = offsets_lookup(s->distro, s->arch);
@@ -289,6 +291,7 @@ int probes_add_config_shims(struct probes *p, const struct config *cfg, const ch
     for (int i = 0; i < cfg->n_shims; i++) {
         struct shim s = { .from_config = 1 };
         snprintf(s.path, sizeof(s.path), "%s", cfg->shims[i].path);
+        snprintf(s.distro, sizeof(s.distro), "%s", cfg->shims[i].distro);
         snprintf(s.arch, sizeof(s.arch), "%s", cfg->shims[i].arch);
         struct stat st;
         if (stat(s.path, &st)) {

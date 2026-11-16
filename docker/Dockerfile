@@ -1,19 +1,20 @@
 # ros2ebpfd image for the Kubernetes DaemonSet (deploy/k8s/robot): daemon + exporter + ros2ebpf-ctl, no ROS inside.
 # Build from the repository root:  docker build -f docker/Dockerfile -t ros2ebpfd .
-# The build stage needs ament_cmake + colcon (ros:rolling-ros-base, Ubuntu 26.04); the runtime stage is plain Ubuntu 26.04.
-# ros2ebpf follows ROS 2 Rolling only (#15): no other distro is a valid base. Everything else
-# (building, the tutorial, CI) happens in the development container of README section 4.
-FROM ros:rolling-ros-base AS build
+# The build stage needs ament_cmake + colcon (ros:lyrical-ros-base, Ubuntu 26.04); the runtime stage is plain Ubuntu 26.04.
+# The daemon has no ROS runtime dependency: the image built on Lyrical probes Lyrical and Rolling shims alike
+# (the offset table is compiled in). Everything else (building, the tutorial, CI) happens in the
+# development container of README section 4.
+FROM ros:lyrical-ros-base AS build
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential cmake pkg-config clang llvm libbpf-dev bpftool \
-      libelf-dev zlib1g-dev libyaml-dev libjson-c-dev ros-rolling-ament-cmake \
+      libelf-dev zlib1g-dev libyaml-dev libjson-c-dev ros-lyrical-ament-cmake \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY ros2ebpf_exporter ros2ebpf_exporter
 COPY ros2ebpf_daemon ros2ebpf_daemon
 ARG BPF_TARGET_ARCH=
-RUN . /opt/ros/rolling/setup.sh \
+RUN . /opt/ros/lyrical/setup.sh \
     && colcon build --merge-install --install-base /opt/ros2ebpf --packages-up-to ros2ebpf_daemon \
          --event-handlers console_cohesion+ \
          --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF ${BPF_TARGET_ARCH:+-DBPF_TARGET_ARCH=$BPF_TARGET_ARCH}

@@ -372,6 +372,7 @@ static struct json_object *config_json(struct daemon *d)
     struct json_object *shims = json_object_new_array();
     for (int i = 0; i < c->n_shims; i++) {
         struct json_object *s = json_object_new_object();
+        json_object_object_add(s, "distro", jstr(c->shims[i].distro));
         json_object_object_add(s, "arch", jstr(c->shims[i].arch));
         json_object_object_add(s, "path", jstr(c->shims[i].path));
         json_object_array_add(shims, s);
@@ -595,7 +596,10 @@ int main(int argc, char **argv)
         for (int i = 0; i < d.cfg.n_shims; i++) {
             char missing[512], distro[32];
             const char *arch = d.cfg.shims[i].arch[0] ? d.cfg.shims[i].arch : d.host_arch;
-            offsets_resolve_distro(d.cfg.shims[i].path, distro, sizeof(distro));
+            if (d.cfg.shims[i].distro[0])
+                snprintf(distro, sizeof(distro), "%s", d.cfg.shims[i].distro);
+            else
+                offsets_resolve_distro(d.cfg.shims[i].path, distro, sizeof(distro));
             if (!offsets_lookup(distro, arch)) {
                 printf("shim %s: FAIL (ROS 2 %s on %s: ros2ebpf supports ROS 2 %s)\n",
                        d.cfg.shims[i].path, distro, arch, offsets_supported_distros());

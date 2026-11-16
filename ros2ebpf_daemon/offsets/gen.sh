@@ -7,18 +7,18 @@
 #   usage: gen.sh [/opt/ros/<distro> | <colcon workspace>/install]
 #
 # The distro of the row is <distro> for /opt/ros/<distro>; for a workspace it is
-# $ROS2EBPF_DISTRO, default rolling (ROS2EBPF_DISTRO in src/offsets.h).
+# $ROS2EBPF_DISTRO, default lyrical (ROS2EBPF_DISTRO in src/offsets.h).
 # Requires a C compiler and the rmw headers of that installation, in the
 # merged layout (/opt/ros/<distro>, or a workspace built with --merge-install).
 set -e
-ROS_ROOT=${1:-/opt/ros/${ROS2EBPF_DISTRO:-rolling}}
+ROS_ROOT=${1:-/opt/ros/${ROS2EBPF_DISTRO:-lyrical}}
 if [ ! -d "$ROS_ROOT/include" ]; then
   echo "usage: $0 [/opt/ros/<distro> | <colcon workspace>/install]" >&2
   exit 2
 fi
 case "$ROS_ROOT" in
   /opt/ros/*) DISTRO=$(echo "${ROS_ROOT#/opt/ros/}" | cut -d/ -f1) ;;
-  *) DISTRO=${ROS2EBPF_DISTRO:-rolling} ;;
+  *) DISTRO=${ROS2EBPF_DISTRO:-lyrical} ;;
 esac
 ARCH=$(uname -m)
 INC="-I$ROS_ROOT/include -I$ROS_ROOT/include/rmw -I$ROS_ROOT/include/rcutils -I$ROS_ROOT/include/rosidl_runtime_c -I$ROS_ROOT/include/rosidl_typesupport_interface -I$ROS_ROOT/include/rosidl_dynamic_typesupport"

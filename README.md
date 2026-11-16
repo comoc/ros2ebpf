@@ -14,7 +14,7 @@ ros2_rmw_service_request_total{host="main",robot="amr-07",domain_id="5",comm="ad
 ros2_process_info{host="main",robot="amr-07",comm="talker",pid="4211",domain_id="5",rmw="rmw_fastrtps_cpp",container="",localhost_only="false"} 1
 ```
 
-- Works against ROS 2 Rolling, binaries or a source build, any RMW, any client library.
+- Works against ROS 2 Lyrical and Rolling, binaries or a source build, any RMW, any client library.
 - One daemon per Linux host; a robot is a set of hosts; a fleet is a set of robots.
 - Nodes in containers are covered automatically (the daemon finds their shim through `/proc`).
 - The daemon never computes a rate: counters are exported, Prometheus does the math.
@@ -84,7 +84,8 @@ Components:
 
 ## Requirements
 
-ros2ebpf follows **ROS 2 Rolling** only, which implies Ubuntu 26.04 for now.
+This is the `lyrical` branch: it supports **ROS 2 Lyrical** and **Rolling**, both on Ubuntu 26.04.
+Development happens on the `rolling` branch; fixes are backported here.
 
 | | Required | Check |
 |---|---|---|
@@ -94,13 +95,13 @@ ros2ebpf follows **ROS 2 Rolling** only, which implies Ubuntu 26.04 for now.
 | Arch | x86_64 or aarch64 | |
 
 `ros2ebpfd` needs root, or `CAP_BPF CAP_PERFMON CAP_SYS_PTRACE` (+`CAP_SYS_RESOURCE`); the containers below run privileged, and the daemon is root inside them.
-ROS 2 lives inside the containers: the Rolling source build of the demo below (the ROS 2 application and ros2ebpf in one container, or in sibling containers in the host pid namespace, which is also what the Kubernetes DaemonSet does).
-Nothing from ROS is installed on the host, and a shim of any other distro is refused by the daemon.
+ROS 2 lives inside the containers: the Lyrical source build of the demo below (the ROS 2 application and ros2ebpf in one container, or in sibling containers in the host pid namespace, which is also what the Kubernetes DaemonSet does).
+Nothing from ROS is installed on the host, and a shim of any distro other than Lyrical and Rolling is refused by the daemon.
 `ros2 ebpf doctor` prints all of this for the host it runs on.
 
 ## Demo: talker, listener and a service
 
-Everything runs in containers on one host: a ROS 2 Rolling source build with the ros2ebpf packages, the demo nodes and the daemon in one container, Prometheus and Grafana in two more.
+Everything runs in containers on one host: a ROS 2 Lyrical source build with the ros2ebpf packages, the demo nodes and the daemon in one container, Prometheus and Grafana in two more.
 At the end a C++ talker (`demo_nodes_cpp`), a Python listener (`demo_nodes_py`) and an `add_two_ints` server / client pair are running, and their rates show up in `ros2 ebpf top`, in Prometheus and on a Grafana dashboard.
 Nothing is installed on the host.
 
@@ -111,7 +112,7 @@ WS=~/ros2_ws        # any colcon workspace you like; the container sees it at th
 mkdir -p $WS/src && git clone https://github.com/fujitatomoya/ros2ebpf.git $WS/src/ros2ebpf
 docker run -it --name ros2ebpf-dev --privileged --pid host --network host \
   -v /sys/fs/bpf:/sys/fs/bpf -v /etc/machine-id:/etc/machine-id:ro \
-  -v $WS:$WS -w $WS tomoyafujita/ros2dev:rolling bash
+  -v $WS:$WS -w $WS tomoyafujita/ros2dev:lyrical bash
 ```
 
 | Option | Why |
@@ -123,7 +124,7 @@ docker run -it --name ros2ebpf-dev --privileged --pid host --network host \
 | `-v /etc/machine-id` | the `machine_id` label; optional |
 | `-v $WS:$WS -w $WS` | the workspace at the same path inside and outside the container, so paths in `/etc/ros2ebpf/config.yaml` and in logs are valid in both; every shell below starts in it |
 
-`tomoyafujita/ros2dev:rolling` ([ros2_devenv_builder](https://github.com/fujitatomoya/ros2_devenv_builder)) is Ubuntu 26.04 with every build dependency of Rolling installed.
+`tomoyafujita/ros2dev:lyrical` ([ros2_devenv_builder](https://github.com/fujitatomoya/ros2_devenv_builder)) is Ubuntu 26.04 with every build dependency of Lyrical installed (`tomoyafujita/ros2dev:rolling` and the `rolling` branch of `ros2.repos` for Rolling; the shim of a Rolling source build then needs `distro: rolling` in the config).
 
 ### Build
 
@@ -131,7 +132,7 @@ Inside the container:
 
 ```bash
 apt update && apt install -y clang llvm libbpf-dev bpftool libelf-dev zlib1g-dev libyaml-dev libjson-c-dev pkg-config python3-yaml python3-colorama
-vcs import --shallow --input https://raw.githubusercontent.com/ros2/ros2/rolling/ros2.repos src
+vcs import --shallow --input https://raw.githubusercontent.com/ros2/ros2/lyrical/ros2.repos src
 colcon build --symlink-install
 source install/setup.bash
 ros2ebpfd --version
@@ -144,7 +145,7 @@ ros2 ebpf --help
 mkdir -p /etc/ros2ebpf
 cp install/ros2ebpf_daemon/etc/ros2ebpf/config.example.yaml /etc/ros2ebpf/config.yaml
 cp install/ros2ebpf_daemon/etc/ros2ebpf/expectations.example.yaml /etc/ros2ebpf/expectations.yaml
-sed -i "s|/opt/ros/rolling/lib/librmw_implementation.so|$PWD/install/rmw_implementation/lib/librmw_implementation.so|" /etc/ros2ebpf/config.yaml
+sed -i "s|/opt/ros/lyrical/lib/librmw_implementation.so|$PWD/install/rmw_implementation/lib/librmw_implementation.so|" /etc/ros2ebpf/config.yaml
 ros2ebpfd --check -c /etc/ros2ebpf/config.yaml      # config parses, shim exports the rmw_* symbols, BTF present
 ```
 
@@ -164,14 +165,14 @@ The daemon log is `~/.ros/log/ros2ebpfd.log`; expected lines:
 
 ```
 I ros2ebpfd 0.1.0 starting: host=main machine_id=… distro=ubuntu-26.04 arch=x86_64 kernel=7.0.0-…
-I shim <workspace>/install/rmw_implementation/lib/librmw_implementation.so: distro=rolling arch=x86_64 dev=… ino=… (config)
+I shim <workspace>/install/rmw_implementation/lib/librmw_implementation.so: distro=lyrical arch=x86_64 dev=… ino=… (config)
 I probe family publish enabled: 2/2 links
 I probe family take enabled: 2/2 links
 I probe family services enabled: 6/6 links
 I probe family udp_drops enabled
 I metrics at http://0.0.0.0:9477/metrics
 I control socket at /run/ros2ebpf/control.sock
-I ready: 16/16 probe links attached, 1 shim(s), offset table rolling/x86_64
+I ready: 16/16 probe links attached, 1 shim(s), offset table lyrical/x86_64
 ```
 
 ### Run the demo nodes
@@ -254,7 +255,8 @@ docker rm -f prometheus grafana       # on the host
 Everything CI does, unattended, in the image of the demo (privileged for the BPF programs, host pid namespace for the daemon):
 
 ```bash
-docker run --rm --privileged --pid host -v "$PWD":/src:ro -w /src tomoyafujita/ros2dev:rolling ./scripts/github_workflows.sh
+docker run --rm --privileged --pid host -v "$PWD":/src:ro -w /src tomoyafujita/ros2dev:lyrical ./scripts/github_workflows.sh
+docker run --rm --privileged --pid host -v "$PWD":/src:ro -w /src -e ROS2EBPF_CI_DISTRO=rolling tomoyafujita/ros2dev:rolling ./scripts/github_workflows.sh
 ```
 
 ## Limitations

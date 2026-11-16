@@ -11,7 +11,8 @@ The annotated reference is [ros2ebpf_daemon/config/config.example.yaml](../ros2e
 Keys marked *restart* are read at start only; everything else is applied by `ros2 ebpf reload` (or SIGHUP).
 
 The one key without a usable default is the shim path: the `librmw_implementation.so` the daemon probes.
-For a Rolling source build it is `<workspace>/install/rmw_implementation/lib/librmw_implementation.so`, as seen from where the daemon runs; a shim outside `/opt/ros/` is taken for Rolling, a shim under `/opt/ros/<other distro>/` is refused.
+For a source build it is `<workspace>/install/rmw_implementation/lib/librmw_implementation.so`, as seen from where the daemon runs.
+The distro of a shim is `shims[].distro` when set, else `<distro>` of `/opt/ros/<distro>/`, else Lyrical (a source build); Lyrical and Rolling are supported, any other distro is refused, so a Rolling source build needs `distro: rolling`.
 Leave `discover_shims: true` (the default) and ROS processes in other containers are found too.
 Set `robot:` only if you do not run a collector that adds the `robot` label ([deployment.md](deployment.md)).
 
@@ -19,7 +20,7 @@ Set `robot:` only if you do not run a collector that adds the `robot` label ([de
 |---|---|---|
 | `host` | kernel hostname | `host` label on every series (*restart*; env `ROS2EBPF_HOST` also works) |
 | `robot` | `""` | fallback `robot` label; normally the collector adds it (env `ROS2EBPF_ROBOT`) |
-| `shims[].path` | — | `librmw_implementation.so` to probe (*restart*): `/opt/ros/rolling/lib/…` or the one of a Rolling source build; `arch` optional (`uname -m`) |
+| `shims[].path` | — | `librmw_implementation.so` to probe (*restart*): `/opt/ros/lyrical/lib/…`, `/opt/ros/rolling/lib/…` or the one of a source build; `distro` optional (`lyrical` or `rolling`; default from the path, else `lyrical`, *restart*), `arch` optional (`uname -m`) |
 | `discover_shims` | `true` | scan `/proc/<pid>/maps` every 5 s for shims in containers |
 | `identity.read_environ` | `true` | read `ROS_DOMAIN_ID`, `RMW_IMPLEMENTATION`, `ROS_LOCALHOST_ONLY`; needs `CAP_SYS_PTRACE` |
 | `identity.default_domain_id` | `0` | when the variable is unset |

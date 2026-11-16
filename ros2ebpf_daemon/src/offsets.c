@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 /*
- * Struct offsets of the rmw handles. ros2ebpf follows ROS 2 Rolling only
- * (fujitatomoya/ros2ebpf#15; ROS2EBPF_DISTRO in offsets.h): the table has one
- * row per supported architecture, and CI regenerates the values from the rmw headers of mainline
- * on every commit (check_rmw_offsets in scripts/github_workflows.sh) so a
- * layout change on mainline fails the build until the row is updated. The
- * public rmw handles start with { implementation_identifier, data, <name> }
- * and rmw_message_info_t carries publication_sequence_number at offset 16 on
- * both LP64 targets, hence the identical values. The row in use is exported
- * per host as ros2ebpf_host_info{offset_table="rolling/<arch>"}.
- * ros2ebpf_daemon/offsets/gen.sh prints the row for a given Rolling install.
+ * Struct offsets of the rmw handles. The lyrical branch of ros2ebpf supports
+ * ROS 2 Lyrical (ROS2EBPF_DISTRO in offsets.h, the default for a source build)
+ * and Rolling: one row per (distro, architecture). CI regenerates the rows of
+ * both distros from their rmw headers on every commit (check_rmw_offsets in
+ * scripts/github_workflows.sh, one job per distro), so a layout change on
+ * Rolling fails the build until its row is updated here (rolling rows are
+ * always backported from the rolling branch). The public rmw handles start with
+ * { implementation_identifier, data, <name> } and rmw_message_info_t carries
+ * publication_sequence_number at offset 16 on both LP64 targets, hence the
+ * identical values. The row in use is exported per host as
+ * ros2ebpf_host_info{offset_table="<distro>/<arch>"}.
+ * ros2ebpf_daemon/offsets/gen.sh prints the row for a given install.
  */
 #include <errno.h>
 #include <fcntl.h>
@@ -23,6 +25,8 @@
 #include "offsets.h"
 
 static const struct offset_entry table[] = {
+    { "lyrical", "x86_64",  16, 16 },
+    { "lyrical", "aarch64", 16, 16 },
     { "rolling", "x86_64",  16, 16 },
     { "rolling", "aarch64", 16, 16 },
 };
