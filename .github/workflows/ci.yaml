@@ -1,27 +1,34 @@
-# ros2ebpf follows ROS 2 rolling only (fujitatomoya/ros2ebpf#8, #15): every job builds and tests
-# against rolling, on Ubuntu 26.04 containers. A distro branch and its workflow are created when
-# the next ROS release is branched.
+# The lyrical branch of ros2ebpf supports ROS 2 Lyrical and Rolling (ROS2EBPF_DISTRO in
+# ros2ebpf_daemon/src/offsets.h is lyrical): one source-build job per distro, each in its ros2dev
+# image on Ubuntu 26.04. The rolling job keeps the rolling rows of the offset table honest
+# against Rolling mainline; rolling-branch fixes are backported here by cherry-pick.
 name: ci
 on:
   push:
-    branches: [rolling]
+    branches: [lyrical]
   pull_request:
-    branches: [rolling]
+    branches: [lyrical]
   workflow_dispatch:
 
 jobs:
-  rolling:
-    name: rolling source build (colcon build + test, offsets vs mainline rmw, daemon + CLI + end-to-end on mainline)
+  source-build:
+    name: ${{ matrix.distro }} source build (colcon build + test, offsets vs ${{ matrix.distro }} rmw, daemon + CLI + end-to-end)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [lyrical, rolling]
     container:
-      image: tomoyafujita/ros2dev:rolling
+      image: tomoyafujita/ros2dev:${{ matrix.distro }}
       # privileged: bpffs mount + BPF program load. pid=host: the BPF programs report host-namespace
       # pids, which the daemon resolves through /proc (same requirement as a containerised deployment).
       options: --privileged --pid=host
+    env:
+      ROS2EBPF_CI_DISTRO: ${{ matrix.distro }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v7
-      - name: Build and test with ROS rolling
+      - name: Build and test with ROS ${{ matrix.distro }}
         shell: bash
         run: |
           ./scripts/github_workflows.sh
@@ -46,7 +53,7 @@ jobs:
           docker run --rm -v "$PWD/deploy:/d:ro" registry.k8s.io/kustomize/kustomize:v5.4.3 build /d/k8s/central/kustomize/plain > /dev/null
       - name: alloy fmt
         run: docker run --rm -v "$PWD/deploy/alloy:/a:ro" grafana/alloy:v1.6.1 fmt /a/config.alloy > /dev/null
-      - name: ros2ebpfd image of the DaemonSet builds (docker/Dockerfile, rolling binaries)
+      - name: ros2ebpfd image of the DaemonSet builds (docker/Dockerfile, lyrical binaries)
         run: |
           docker build -f docker/Dockerfile -t ros2ebpfd:ci .
           docker run --rm --entrypoint ros2ebpfd ros2ebpfd:ci --version

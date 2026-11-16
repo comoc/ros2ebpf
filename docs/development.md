@@ -5,11 +5,11 @@
 All four packages are ROS 2 packages built with colcon: `ros2ebpf_exporter`, `ros2ebpf_daemon` and `ros2ebpf_interfaces` are `ament_cmake`, `ros2ebpf` is `ament_python`.
 The daemon and exporter use ament only at build time: nothing from ROS is needed where they run.
 
-ros2ebpf follows ROS 2 **Rolling** only (#15): one row per architecture in the offset table, one CI job, one build procedure, all against a Rolling source build on Ubuntu 26.04, in a container.
-A distro branch is created when the next ROS release is branched; nothing is backported before that, and nothing in the tree names another distro.
+This is the `lyrical` branch: ROS 2 **Lyrical** (`ROS2EBPF_DISTRO`, the default) and **Rolling** are supported, with one offset table row per (distro, architecture), one CI job per distro and one build procedure, against a source build on Ubuntu 26.04, in a container.
+Development happens on `rolling`; this branch takes fixes by backport (see [Branches](#branches)).
 
 The build procedure is the [README demo](../README.md#demo-talker-listener-and-a-service): start the development container (`--privileged --pid host --network host`, the workspace mounted), build mainline and the ros2ebpf packages.
-The repository is cloned into `src/` of that workspace; it is a colcon workspace by itself too (`build/`, `install/`, `log/` are git-ignored) when the Rolling install is sourced from elsewhere.
+The repository is cloned into `src/` of that workspace; it is a colcon workspace by itself too (`build/`, `install/`, `log/` are git-ignored) when the Lyrical or Rolling install is sourced from elsewhere.
 What development adds, in the same container:
 
 ```bash
@@ -17,17 +17,18 @@ apt install -y python3-pytest python3-flake8
 colcon test --merge-install --packages-select ros2ebpf_exporter ros2ebpf_daemon ros2ebpf_interfaces ros2ebpf
 colcon test-result --verbose
 (cd src/ros2ebpf/ros2ebpf && python3 -m flake8 --select=E,W,F --extend-ignore=W503 --max-line-length=120 ros2ebpf test)
-sh src/ros2ebpf/ros2ebpf_daemon/offsets/gen.sh install     # the offset row of this Rolling build; must equal the one in src/offsets.c
+sh src/ros2ebpf/ros2ebpf_daemon/offsets/gen.sh install     # the offset row of this Lyrical build (ROS2EBPF_DISTRO=rolling for Rolling); must equal the one in src/offsets.c
 ```
 
 Everything CI does, unattended, in a throwaway container of the same image (nothing but the clone on the host; privileged for the BPF programs, host pid namespace for the daemon):
 
 ```bash
-docker run --rm --privileged --pid host -v "$PWD":/src:ro -w /src tomoyafujita/ros2dev:rolling ./scripts/github_workflows.sh
+docker run --rm --privileged --pid host -v "$PWD":/src:ro -w /src tomoyafujita/ros2dev:lyrical ./scripts/github_workflows.sh
+docker run --rm --privileged --pid host -v "$PWD":/src:ro -w /src -e ROS2EBPF_CI_DISTRO=rolling tomoyafujita/ros2dev:rolling ./scripts/github_workflows.sh
 ```
 
-`scripts/github_workflows.sh` imports `ros2.repos` of mainline and builds `rmw`, `rmw_implementation`, `ros2cli` and `demo_nodes_cpp` with everything they need plus the ros2ebpf packages, as in the README demo's build step.
-It then runs the unit tests and flake8, checks the offset table in `ros2ebpf_daemon/src/offsets.c` against the mainline `rmw` headers (`offsets/gen.sh`), starts the daemon on the kernel with its uprobes attached to the mainline-built `librmw_implementation.so` (all probe links must attach and the `rolling/<arch>` offset table must be in use), drives it with `ros2 ebpf start` / `stop` on the mainline ros2cli, and runs the end-to-end test with the mainline demo nodes (docs/testing.md).
+`scripts/github_workflows.sh` imports `ros2.repos` of the distro's branch ("mainline" below) and builds `rmw`, `rmw_implementation`, `ros2cli` and `demo_nodes_cpp` with everything they need plus the ros2ebpf packages, as in the README demo's build step.
+It then runs the unit tests and flake8, checks the offset table in `ros2ebpf_daemon/src/offsets.c` against the mainline `rmw` headers (`offsets/gen.sh`), starts the daemon on the kernel with its uprobes attached to the mainline-built `librmw_implementation.so` (all probe links must attach and the `<distro>/<arch>` offset table must be in use), drives it with `ros2 ebpf start` / `stop` on the mainline ros2cli, and runs the end-to-end test with the mainline demo nodes (docs/testing.md).
 
 Build options (`--cmake-args`): `-DBUILD_TESTING=OFF` skips the unit tests, `-DBPF_TARGET_ARCH=arm64` cross-compiles the BPF objects.
 The C tests are registered with `ament_add_test`, so `colcon test-result` sees them like any other ROS package's tests.
@@ -53,7 +54,7 @@ ros2ebpf_daemon/src/probes.c                skeletons, pin root, shim registry +
 ros2ebpf_daemon/src/identity.c              /proc -> processes map, exit sweep, GC
 ros2ebpf_daemon/src/control.c               JSON-RPC over unix socket / HTTP
 ros2ebpf_daemon/src/config.c                libyaml -> struct config
-ros2ebpf_daemon/src/offsets.c               rolling/<arch> -> struct offsets; ELF symbol check
+ros2ebpf_daemon/src/offsets.c               <distro>/<arch> -> struct offsets; ELF symbol check
 ros2ebpf_daemon/src/udpmap.c                port -> pid/comm via /proc/net/udp + /proc/<pid>/fd
 ros2ebpf_daemon/src/main.c                  epoll loop, RPC handlers, reload
 ros2ebpf_daemon/src/ros2ebpf-ctl.c          thin control client
@@ -96,12 +97,12 @@ New methods are added to `handle_rpc()` in `main.c`, to the schema, and get a ve
 
 ## Releasing
 
-The packages are source packages; binaries come from the ROS build farm (bloom release, then `ros-rolling-ros2ebpf-*` under `/opt/ros/rolling`) like for any ROS 2 package, and nothing is packaged in this repository.
+The packages are source packages; binaries come from the ROS build farm (bloom release, then `ros-lyrical-ros2ebpf-*` under `/opt/ros/lyrical`) like for any ROS 2 package, and nothing is packaged in this repository.
 Prerequisite: rosdep keys for `libbpf-dev` and `bpftool` (a `ros/rosdistro` pull request); until they exist `rosdep install` needs `--skip-keys "libbpf-dev bpftool"`.
 The daemon links the exporter library statically and installs the example configs to `etc/ros2ebpf/`; it reads `/etc/ros2ebpf/config.yaml` by default.
 There is no service file: the daemon is started on request with `ros2 ebpf start` ([cli.md](cli.md#start-and-privileges)) or as the Kubernetes DaemonSet.
 
-`docker/Dockerfile` is the one container image: `ros2ebpfd` + exporter + `ros2ebpf-ctl` on Ubuntu 26.04, built from Rolling binaries, for the Kubernetes DaemonSet under `deploy/k8s/robot/`.
+`docker/Dockerfile` is the one container image: `ros2ebpfd` + exporter + `ros2ebpf-ctl` on Ubuntu 26.04, built from Lyrical binaries (it probes Lyrical and Rolling shims alike), for the Kubernetes DaemonSet under `deploy/k8s/robot/`.
 Everything else runs in the development container (the README demo).
 
 ## Deploy sources of truth
@@ -116,17 +117,19 @@ Diffs then show the sentence that changed instead of a rewrapped paragraph.
 
 ## Branches
 
-`rolling` is the default and development branch; pull requests target it.
-`main` is a read-only mirror of `rolling` (`.github/workflows/mirror-rolling-to-main.yaml` force-pushes it on every push to `rolling`, as the ROS 2 core repositories do), so `main` is never pushed to directly.
-There are no release branches yet: the first one is created when the packages are released into a ROS distro, and nothing is backported before that.
+`rolling` is the default and development branch; pull requests target it, and `main` mirrors it.
+`lyrical` is the release branch for ROS 2 Lyrical, branched from `rolling` after the distro was centralised in `ROS2EBPF_DISTRO` (#1); it also keeps Rolling working.
+Changes land on `rolling` first and are backported with `git cherry-pick -x` in a pull request against `lyrical`:
+
+- always backport: bug fixes, and every update of the `rolling` rows of `src/offsets.c` (the rolling job here fails until it is);
+- do not backport: anything that needs a rcl / rmw / ros2cli API newer than Lyrical, and `rolling`-branch-only files (the Rolling-only CI, the mirror workflow).
 
 ## CI
 
-`.github/workflows/ci.yaml`, rolling only:
+`.github/workflows/ci.yaml`, on the `lyrical` branch:
 
-- `rolling`: `scripts/github_workflows.sh` inside the `tomoyafujita/ros2dev:rolling` container (privileged): Rolling source build of `rmw` / `rmw_implementation` / `ros2cli` / `demo_nodes_cpp`, `colcon build` + `colcon test` of all packages, flake8, offset table vs. mainline `rmw`, the daemon probing the mainline `librmw_implementation.so` (BPF verifier, all links attached), `ros2 ebpf` on mainline ros2cli, and the end-to-end test with the mainline demo nodes.
+- `source-build` (matrix `lyrical`, `rolling`): `scripts/github_workflows.sh` inside the `tomoyafujita/ros2dev:<distro>` container (privileged, `ROS2EBPF_CI_DISTRO=<distro>`): source build of `rmw` / `rmw_implementation` / `ros2cli` / `demo_nodes_cpp`, `colcon build` + `colcon test` of all packages, flake8, offset table vs. mainline `rmw`, the daemon probing the mainline `librmw_implementation.so` (BPF verifier, all links attached), `ros2 ebpf` on mainline ros2cli, and the end-to-end test with the mainline demo nodes.
   The workflow file only calls the script, so CI changes are script changes that run identically with the `docker run` above.
 - `deploy-lint`: `deploy/k8s/sync.sh` must leave no diff, then validation of everything under `deploy/` (promtool on both Prometheus configs and the rules, amtool, kustomize, alloy fmt) and a build of the DaemonSet image (`docker/Dockerfile`).
 
-When a release branch is created, its workflow is a copy of the `rolling` job with the distro's `ros2dev` image, as in the other `fujitatomoya` repositories.
-The distro name lives in one place, `ROS2EBPF_DISTRO` in `ros2ebpf_daemon/src/offsets.h`; the CI script reads it from there (`ROS2EBPF_CI_DISTRO` overrides it), so a release branch changes that constant, the rows of `src/offsets.c` and `SUPPORTED_DISTROS` in `ros2ebpf/ros2ebpf/verb/doctor.py` ([offsets/README.md](../ros2ebpf_daemon/offsets/README.md)).
+The default distro lives in one place, `ROS2EBPF_DISTRO` in `ros2ebpf_daemon/src/offsets.h` (`lyrical` here); the CI script reads it from there and `ROS2EBPF_CI_DISTRO` selects the other job's distro, which also goes into `shims[].distro` of the daemon config. The supported distros are the rows of `src/offsets.c` and `SUPPORTED_DISTROS` in `ros2ebpf/ros2ebpf/verb/doctor.py`, kept equal by a test ([offsets/README.md](../ros2ebpf_daemon/offsets/README.md)).

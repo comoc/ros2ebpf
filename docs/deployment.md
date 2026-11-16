@@ -21,11 +21,11 @@ Correlation scope: `(robot, domain_id)`.
 ## 1. Every host of the robot: `ros2ebpfd`
 
 Repeat on each host (`main`, `perception`, `arm` …).
-Hosts may run different RMWs and CPU architectures (all on ROS 2 Rolling); each daemon exports what it found in `ros2ebpf_host_info`.
+Hosts may run different RMWs and CPU architectures (ROS 2 Lyrical or Rolling); each daemon exports what it found in `ros2ebpf_host_info`.
 
 ```bash
 # install: the development container build (the README demo), the ros2ebpfd image (docker/Dockerfile, below), or
-# the ros-rolling-ros2ebpf-daemon package once the packages are released to the ROS build farm
+# the ros-lyrical-ros2ebpf-daemon package once the packages are released to the ROS build farm
 sudo mkdir -p /etc/ros2ebpf && sudo cp install/ros2ebpf_daemon/etc/ros2ebpf/config.example.yaml /etc/ros2ebpf/config.yaml
 sudoedit /etc/ros2ebpf/config.yaml
 ```
@@ -36,7 +36,7 @@ Per-host settings that matter in a multi-host robot:
 host: ""                 # keep empty if hostnames are unique and stable across the robot ("main", "perception")
 robot: ""                # leave empty: the collector sets it. Set only when scraping without a collector.
 shims:
-  - path: /opt/ros/rolling/lib/librmw_implementation.so    # or the one of this host's Rolling source build
+  - path: /opt/ros/lyrical/lib/librmw_implementation.so    # or the one of this host's source build (distro: rolling for Rolling)
 discover_shims: true
 expectations_file: /etc/ros2ebpf/expectations.yaml         # the file exists on ONE host only (see §2)
 ```

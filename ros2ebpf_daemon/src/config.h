@@ -10,8 +10,9 @@
 #define CFG_DEFAULT_PATH "/etc/ros2ebpf/config.yaml"
 
 struct cfg_shim {
+    char distro[32];          /* "" = from the path: <distro> under /opt/ros/, else ROS2EBPF_DISTRO */
     char arch[16];            /* "" = uname -m */
-    char path[512];           /* /opt/ros/rolling/lib/librmw_implementation.so, or the one of a source build */
+    char path[512];           /* /opt/ros/lyrical/lib/librmw_implementation.so, or the one of a source build */
 };
 
 struct config {

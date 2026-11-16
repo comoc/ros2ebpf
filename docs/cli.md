@@ -37,14 +37,14 @@ Expected log lines of a healthy start (one shim, every family enabled):
 
 ```
 I ros2ebpfd 0.1.0 starting: host=main machine_id=… distro=ubuntu-26.04 arch=x86_64 kernel=7.0.0-…
-I shim <workspace>/install/rmw_implementation/lib/librmw_implementation.so: distro=rolling arch=x86_64 dev=… ino=… (config)
+I shim <workspace>/install/rmw_implementation/lib/librmw_implementation.so: distro=lyrical arch=x86_64 dev=… ino=… (config)
 I probe family publish enabled: 2/2 links
 I probe family take enabled: 2/2 links
 I probe family services enabled: 6/6 links
 I probe family udp_drops enabled
 I metrics at http://0.0.0.0:9477/metrics
 I control socket at /run/ros2ebpf/control.sock
-I ready: 16/16 probe links attached, 1 shim(s), offset table rolling/x86_64
+I ready: 16/16 probe links attached, 1 shim(s), offset table lyrical/x86_64
 ```
 
 ## Day-2 operations

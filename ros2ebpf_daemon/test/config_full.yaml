@@ -2,8 +2,9 @@ host: main
 robot: amr-07
 shims:
   - arch: x86_64
-    path: /opt/ros/rolling/lib/librmw_implementation.so
+    path: /opt/ros/lyrical/lib/librmw_implementation.so
   - path: /ws/install/lib/librmw_implementation.so
+    distro: rolling
 discover_shims: false
 identity:
   read_environ: true

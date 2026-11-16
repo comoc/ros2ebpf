@@ -44,7 +44,7 @@ REQUIRED_SYMBOLS = (
 )
 CAP_SYS_ADMIN, CAP_SYS_PTRACE, CAP_PERFMON, CAP_BPF = 21, 19, 38, 39
 # The ROS 2 distros ros2ebpfd has an offset table row for (ros2ebpf_daemon/src/offsets.c).
-SUPPORTED_DISTROS = ('rolling',)
+SUPPORTED_DISTROS = ('lyrical', 'rolling')
 PROC_PID_INIT_INO = 0xEFFFFFFC  # include/linux/proc_ns.h: inode of the initial pid namespace
 
 

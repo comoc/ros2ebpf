@@ -97,6 +97,6 @@ sum by (service) (rate(ros2_rmw_service_request_total{side="client"}[1m]))
 # processes with endpoints but unknown domain (identity problem)
 ros2_process_info{domain_id="unknown"}
 
-# which offset table row (rolling/<arch>) each host uses
+# which offset table row (lyrical/<arch> or rolling/<arch>) each host uses
 count by (arch, offset_table) (ros2ebpf_host_info)
 ```

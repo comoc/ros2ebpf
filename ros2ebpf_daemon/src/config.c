@@ -73,7 +73,8 @@ static int apply(struct config *c, const char *path, const char *val, int in_seq
         if (idx >= c->n_shims)
             c->n_shims = idx + 1;
         struct cfg_shim *s = &c->shims[idx];
-        if (!strcmp(field, "arch")) set_str(s->arch, sizeof(s->arch), val);
+        if (!strcmp(field, "distro")) set_str(s->distro, sizeof(s->distro), val);
+        else if (!strcmp(field, "arch")) set_str(s->arch, sizeof(s->arch), val);
         else if (!strcmp(field, "path")) set_str(s->path, sizeof(s->path), val);
         else log_warn("config: unknown key %s", path);
     }
@@ -284,7 +285,7 @@ int config_runtime_immutable_changed(const struct config *a, const struct config
     if (a->n_shims != b->n_shims)
         return 1;
     for (int i = 0; i < a->n_shims; i++)
-        if (strcmp(a->shims[i].path, b->shims[i].path))
+        if (strcmp(a->shims[i].path, b->shims[i].path) || strcmp(a->shims[i].distro, b->shims[i].distro))
             return 1;
     return strcmp(a->pin_root, b->pin_root) || strcmp(a->exporter_listen, b->exporter_listen) ||
            strcmp(a->exporter_mode, b->exporter_mode) || strcmp(a->control_socket, b->control_socket) ||

@@ -3,12 +3,12 @@
 #define ROS2EBPF_OFFSETS_H
 #include "ros2ebpf/maps.h"
 
-/* The ROS 2 distro this branch of ros2ebpf follows: the distro a shim outside /opt/ros/
- * (the colcon install/ of a source build) is taken for, and the row the config map holds
- * before the first shim is registered. A distro branch changes this line and the table in
- * offsets.c, nothing else in the daemon. */
+/* The ROS 2 distro this branch of ros2ebpf follows (the lyrical branch also supports
+ * Rolling, see offsets.c): the distro a shim outside /opt/ros/ (the colcon install/ of a
+ * source build) is taken for unless shims[].distro says otherwise, and the row the config
+ * map holds before the first shim is registered. */
 #ifndef ROS2EBPF_DISTRO
-#define ROS2EBPF_DISTRO "rolling"
+#define ROS2EBPF_DISTRO "lyrical"
 #endif
 
 struct offset_entry {
@@ -27,7 +27,7 @@ int offsets_distro_from_path(const char *path, char *out, size_t n);
 /* The distro of a shim as the process sees it (`seen_path`): <distro> under /opt/ros/,
  * ROS2EBPF_DISTRO anywhere else. Whether the table has a row for it is offsets_lookup's call. */
 void offsets_resolve_distro(const char *seen_path, char *out, size_t n);
-/* The distros of the table, comma separated ("rolling"), for error messages. */
+/* The distros of the table, comma separated ("lyrical, rolling"), for error messages. */
 const char *offsets_supported_distros(void);
 /* The ROS2EBPF_DISTRO row of this machine (uname -m): what the config map holds before the
  * first shim is registered. */

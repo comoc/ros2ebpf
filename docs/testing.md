@@ -16,10 +16,10 @@ The whole CI script, including the end-to-end test below, runs locally in the de
 
 ## 2. End-to-end (CI, every commit)
 
-`end_to_end` in `scripts/github_workflows.sh`, in the `rolling` job of `.github/workflows/ci.yaml` (privileged `tomoyafujita/ros2dev:rolling` container in the host pid namespace, so the BPF programs load on the runner kernel and the daemon can resolve the pids they report).
+`end_to_end` in `scripts/github_workflows.sh`, in both `source-build` jobs of `.github/workflows/ci.yaml`, lyrical and rolling (privileged `tomoyafujita/ros2dev:<distro>` container in the host pid namespace, so the BPF programs load on the runner kernel and the daemon can resolve the pids they report).
 Everything is built from mainline source first (section 1).
 
-Scenario: the daemon with a static shim on the mainline-built `librmw_implementation.so` (`offset table rolling/<arch>`); the mainline `demo_nodes_cpp` `talker`, `listener`, `add_two_ints_server` and a client every second in domain 5, in the same container.
+Scenario: the daemon with a static shim on the mainline-built `librmw_implementation.so` (`shims[].distro` of the job, `offset table <distro>/<arch>`); the mainline `demo_nodes_cpp` `talker`, `listener`, `add_two_ints_server` and a client every second in domain 5, in the same container.
 Assertions on `ros2ebpf-ctl metrics`:
 
 - publish / take counters for `/chatter` with `host`, `domain_id=5`, `comm`, growing over 3 s;
@@ -29,14 +29,14 @@ Assertions on `ros2ebpf-ctl metrics`:
 - `ros2_process_info` carries the pid, an `rmw_*` implementation and the domain;
 - the daemon is started with `ros2 ebpf start` and stopped with `ros2 ebpf stop` (mainline ros2cli);
 - `ros2 ebpf monitor --once` shows the talker and listener rows and the health line, and the curses UI renders `/chatter` for a few seconds under a pseudo-terminal;
-- `ros2ebpf_host_info{offset_table="rolling/…"}`;
+- `ros2ebpf_host_info{offset_table="<distro>/…"}`;
 - `probes_attached == probes_configured`, zero name read failures;
 - short-lived client processes are swept (bounded number of process series);
 - `disable take` turns the family off and `status -q` stays 0; `enable take` re-attaches 2/2 links;
 - counters survive `ros2 ebpf stop` + `ros2 ebpf start` (pinned maps);
 - `ros2 ebpf status` and `ros2 ebpf top --once` (mainline ros2cli) against the daemon.
 
-Last verified run (kernel 7.0 host, ros2dev:rolling container, mainline source):
+Last verified run of the rolling job (kernel 7.0 host, ros2dev:rolling container, mainline source):
 
 ```
 PASS talker publishes /chatter in domain 5
@@ -76,10 +76,10 @@ Prerequisites: two or more hosts on one LAN, `ros2ebpfd` on each (package or con
 
 | # | Step | Expected |
 |---|---|---|
-| 1 | `ros2ebpf-ctl status -q` on every host | exit 0; `ros2ebpf_host_info` with distinct `host`, correct `arch`/`offset_table` (`rolling/<arch>`) |
+| 1 | `ros2ebpf-ctl status -q` on every host | exit 0; `ros2ebpf_host_info` with distinct `host`, correct `arch`/`offset_table` (`lyrical/<arch>` or `rolling/<arch>`) |
 | 2 | collector scraping all hosts | `up{job="ros2ebpf"}` = 1 per host in central, `robot` label set |
 | 3 | talker on host A, listener on host B, same domain | `rate(ros2_rmw_publish_total{host="A"}[1m])` ≈ `rate(ros2_rmw_take_total{host="B"}[1m])` |
-| 4 | mixed arch (an aarch64 host next to x86_64 ones) | step 3 holds; `offset_table` is `rolling/aarch64` there; `ros2ebpf_name_read_failures_total` stays 0 |
+| 4 | mixed arch (an aarch64 host next to x86_64 ones) | step 3 holds; `offset_table` is `<distro>/aarch64` there; `ros2ebpf_name_read_failures_total` stays 0 |
 | 5 | a node in a container on host B | `ros2_process_info{host="B",container!=""}`; counted like any other |
 | 6 | `ros2 ebpf status --robot <name>` from the operator machine (fleet.yaml, ssh) | one healthy row per host |
 | 7 | expectations with `takers`; stop the listener on B | `Ros2CrossHostLoss` fires within ~3 min; resolves after restart |

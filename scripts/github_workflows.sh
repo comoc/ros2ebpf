@@ -3,13 +3,16 @@
 #####################################################################
 # ros2ebpf: ROS 2 endpoint statistics via eBPF.
 #
-# This script builds and tests ros2ebpf against a ROS 2 Rolling *source*
-# build inside the ros2dev container image, see
+# This script builds and tests ros2ebpf against a ROS 2 *source* build of one
+# distro inside that distro's ros2dev container image, see
 # https://github.com/fujitatomoya/ros2_devenv_builder
 #
-# ros2ebpf follows rolling only (fujitatomoya/ros2ebpf#8, #15): the daemon
-# probes librmw_implementation.so through struct offsets of rmw, and the
-# CLI is a ros2cli plugin. Mainline head of rmw, rmw_implementation,
+# The lyrical branch supports ROS 2 Lyrical (ROS2EBPF_DISTRO in
+# ros2ebpf_daemon/src/offsets.h, the default here) and Rolling; CI runs this
+# script once per distro, ROS2EBPF_CI_DISTRO=rolling in the ros2dev:rolling
+# container for the second. "Mainline" below is the head of that distro's
+# branch of ros2.repos. The daemon probes librmw_implementation.so through
+# struct offsets of rmw, and the CLI is a ros2cli plugin. Mainline head of rmw, rmw_implementation,
 # ros2cli and demo_nodes_cpp (with everything they need) is built from
 # source here; then the offset table in ros2ebpf_daemon/src/offsets.c is
 # checked against the mainline rmw headers, the daemon attaches its
@@ -25,6 +28,8 @@
 # can resolve the pids the BPF programs report, as in any containerised deployment):
 #
 #   docker run --rm --privileged --pid host -v "$PWD":/src:ro -w /src \
+#     tomoyafujita/ros2dev:lyrical ./scripts/github_workflows.sh
+#   docker run --rm --privileged --pid host -v "$PWD":/src:ro -w /src -e ROS2EBPF_CI_DISTRO=rolling \
 #     tomoyafujita/ros2dev:rolling ./scripts/github_workflows.sh
 #
 # The interactive version of the same build, in the same container, is
@@ -168,11 +173,13 @@ function verify_daemon () {
     echo "[${FUNCNAME[0]}]: load the BPF objects, probe the mainline librmw_implementation.so, query the daemon."
     cd ${COLCON_WORKSPACE}
     mount -t bpf bpf /sys/fs/bpf 2>/dev/null || true
-    # the shim of the source build is not under /opt/ros/: the daemon takes it for rolling
+    # the shim of the source build is not under /opt/ros/: the daemon would take it for
+    # ROS2EBPF_DISTRO (lyrical), so the config names the distro that was built
     cat > /tmp/ci.yaml <<YAML
 host: e2e
 shims:
   - path: ${COLCON_WORKSPACE}/install/lib/librmw_implementation.so
+    distro: ${ROS_DISTRO}
 discover_shims: false
 exporter: {listen: 127.0.0.1:19477}
 control: {socket: /tmp/r2e.sock}
@@ -303,9 +310,10 @@ function end_to_end () {
 
 export DEBIAN_FRONTEND=noninteractive
 export COLCON_WORKSPACE=/tmp/colcon_ws
-# The distro this branch follows (ROS2EBPF_DISTRO in ros2ebpf_daemon/src/offsets.h, rolling here, #15):
-# the branch of ros2.repos, and the row of the offset table that is checked. ROS2EBPF_CI_DISTRO
-# overrides it; the ros2dev image's own ROS_DISTRO does not.
+# The distro under test: ROS2EBPF_DISTRO in ros2ebpf_daemon/src/offsets.h (lyrical), or
+# ROS2EBPF_CI_DISTRO (rolling, the second CI job); the ros2dev image's own ROS_DISTRO is not used.
+# It selects the branch of ros2.repos, the row of the offset table that is checked and the
+# shims[].distro of the daemon config.
 ROS_DISTRO=${ROS2EBPF_CI_DISTRO:-$(sed -n 's/^#define ROS2EBPF_DISTRO "\(.*\)"$/\1/p' "$(dirname "$0")/../ros2ebpf_daemon/src/offsets.h")}
 [ -n "${ROS_DISTRO}" ] || { echo "ROS2EBPF_DISTRO not found in ros2ebpf_daemon/src/offsets.h"; exit 1; }
 export ROS_DISTRO
