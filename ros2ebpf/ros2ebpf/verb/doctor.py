@@ -43,6 +43,8 @@ REQUIRED_SYMBOLS = (
     'rmw_get_implementation_identifier',
 )
 CAP_SYS_ADMIN, CAP_SYS_PTRACE, CAP_PERFMON, CAP_BPF = 21, 19, 38, 39
+# The ROS 2 distros ros2ebpfd has an offset table row for (ros2ebpf_daemon/src/offsets.c).
+SUPPORTED_DISTROS = ('rolling',)
 PROC_PID_INIT_INO = 0xEFFFFFFC  # include/linux/proc_ns.h: inode of the initial pid namespace
 
 
@@ -177,9 +179,10 @@ class DoctorVerb(VerbExtension):
         else:
             rep('WARN', f'config {args.config}', 'not found (daemon uses defaults + shim discovery)')
         if not shims:
-            # Rolling only: the binaries under /opt/ros/rolling, or the source build whose
+            # the binaries under /opt/ros/<supported distro>, or the source build whose
             # install/ is sourced in this shell (every prefix of AMENT_PREFIX_PATH)
-            prefixes = ['/opt/ros/rolling'] + os.environ.get('AMENT_PREFIX_PATH', '').split(os.pathsep)
+            prefixes = [f'/opt/ros/{d}' for d in SUPPORTED_DISTROS] + \
+                os.environ.get('AMENT_PREFIX_PATH', '').split(os.pathsep)
             for prefix in prefixes:
                 p = os.path.join(prefix, 'lib', 'librmw_implementation.so')
                 if prefix and os.path.exists(p) and p not in shims:

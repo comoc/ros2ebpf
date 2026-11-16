@@ -226,20 +226,21 @@ static int find_rejected(const struct probes *p, dev_t dev, ino_t ino)
     return 0;
 }
 
-/* ros2ebpf follows ROS 2 Rolling only (#15). A shim under /opt/ros/<distro>/ names its
- * distro and anything else (the colcon install/ of a source build) is Rolling; a shim of
- * another distro is refused. `seen_path` is the path as the process sees it: for a
- * discovered shim the in-container path, not /proc/<pid>/root/<path>. */
+/* The distro of a shim comes from where the process sees it (offsets_resolve_distro):
+ * <distro> under /opt/ros/, ROS2EBPF_DISTRO for anything else (the colcon install/ of a
+ * source build). A distro without a row in the offset table is refused. `seen_path` is the
+ * path as the process sees it: for a discovered shim the in-container path, not
+ * /proc/<pid>/root/<path>. */
 static int resolve_shim_offsets(struct shim *s, const char *seen_path, const char *host_arch)
 {
-    if (offsets_distro_from_path(seen_path, s->distro, sizeof(s->distro)) != 0)
-        snprintf(s->distro, sizeof(s->distro), "rolling");
+    offsets_resolve_distro(seen_path, s->distro, sizeof(s->distro));
     if (!s->arch[0])
         snprintf(s->arch, sizeof(s->arch), "%s", host_arch);
     s->off = offsets_lookup(s->distro, s->arch);
     if (!s->off) {
-        log_error("shim %s: ROS 2 %s on %s is not supported (ros2ebpf follows Rolling only, "
-                  "on x86_64 and aarch64); skipping it", s->path, s->distro, s->arch);
+        log_error("shim %s: ROS 2 %s on %s is not supported (ros2ebpf supports ROS 2 %s, "
+                  "on x86_64 and aarch64); skipping it", s->path, s->distro, s->arch,
+                  offsets_supported_distros());
         return -1;
     }
     return 0;

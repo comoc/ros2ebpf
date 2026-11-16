@@ -58,20 +58,26 @@ int main(int argc, char **argv)
     CHECK(config_runtime_immutable_changed(&c, &c2) == 1);
     CHECK(config_runtime_immutable_changed(&c, &c) == 0);
 
-    /* offsets: Rolling only, x86_64 and aarch64 */
-    const struct offset_entry *e = offsets_lookup("rolling", "x86_64");
+    /* offsets: ROS2EBPF_DISTRO (Rolling) only, x86_64 and aarch64 */
+    const struct offset_entry *e = offsets_lookup(ROS2EBPF_DISTRO, "x86_64");
     CHECK(e && e->name_off == 16 && e->msginfo_pubseq == 16);
-    e = offsets_lookup("rolling", "aarch64");
+    e = offsets_lookup(ROS2EBPF_DISTRO, "aarch64");
     CHECK(e && e->name_off == 16 && e->msginfo_pubseq == 16);
     CHECK(offsets_lookup("humble", "x86_64") == NULL);
-    CHECK(offsets_lookup("rolling", "riscv64") == NULL);
+    CHECK(offsets_lookup(ROS2EBPF_DISTRO, "riscv64") == NULL);
+    CHECK(!strcmp(offsets_supported_distros(), ROS2EBPF_DISTRO));
+    CHECK(!strcmp(offsets_supported_distros(), ROS2EBPF_DISTRO));   /* cached */
     CHECK(offsets_lookup("", "x86_64") == NULL);
     char d[32];
     CHECK(offsets_distro_from_path("/proc/123/root/opt/ros/rolling/lib/librmw_implementation.so", d, sizeof(d)) == 0 && !strcmp(d, "rolling"));
     CHECK(offsets_distro_from_path("/opt/ros/humble/lib/librmw_implementation.so", d, sizeof(d)) == 0 && !strcmp(d, "humble"));
-    /* a source build: not under /opt/ros, taken for Rolling by the daemon */
+    /* a source build: not under /opt/ros, taken for ROS2EBPF_DISTRO by the daemon */
     CHECK(offsets_distro_from_path("/ws/install/lib/librmw_implementation.so", d, sizeof(d)) != 0);
     CHECK(offsets_distro_from_path("/usr/lib/librmw_implementation.so", d, sizeof(d)) != 0);
+    offsets_resolve_distro("/ws/install/lib/librmw_implementation.so", d, sizeof(d));
+    CHECK(!strcmp(d, ROS2EBPF_DISTRO));
+    offsets_resolve_distro("/opt/ros/humble/lib/librmw_implementation.so", d, sizeof(d));
+    CHECK(!strcmp(d, "humble"));
     char missing[256];
     CHECK(offsets_check_shim("/nonexistent.so", missing, sizeof(missing)) != 0);
     CHECK(offsets_check_shim(argv[0], missing, sizeof(missing)) != 0 && strstr(missing, "rmw_publish"));

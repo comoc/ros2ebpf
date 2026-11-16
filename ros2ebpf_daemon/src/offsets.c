@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /*
  * Struct offsets of the rmw handles. ros2ebpf follows ROS 2 Rolling only
- * (fujitatomoya/ros2ebpf#15): the table has one row per supported
- * architecture, and CI regenerates the values from the rmw headers of mainline
+ * (fujitatomoya/ros2ebpf#15; ROS2EBPF_DISTRO in offsets.h): the table has one
+ * row per supported architecture, and CI regenerates the values from the rmw headers of mainline
  * on every commit (check_rmw_offsets in scripts/github_workflows.sh) so a
  * layout change on mainline fails the build until the row is updated. The
  * public rmw handles start with { implementation_identifier, data, <name> }
@@ -40,7 +40,7 @@ const struct offset_entry *offsets_lookup(const char *distro, const char *arch)
 const struct offset_entry *offsets_host_default(void)
 {
     struct utsname u;
-    const struct offset_entry *e = uname(&u) == 0 ? offsets_lookup("rolling", u.machine) : NULL;
+    const struct offset_entry *e = uname(&u) == 0 ? offsets_lookup(ROS2EBPF_DISTRO, u.machine) : NULL;
     return e ? e : &table[0];
 }
 
@@ -55,6 +55,29 @@ int offsets_distro_from_path(const char *path, char *out, size_t n)
         return -1;
     snprintf(out, n, "%.*s", (int)(end - p), p);
     return 0;
+}
+
+void offsets_resolve_distro(const char *seen_path, char *out, size_t n)
+{
+    if (offsets_distro_from_path(seen_path, out, n) != 0)
+        snprintf(out, n, "%s", ROS2EBPF_DISTRO);
+}
+
+const char *offsets_supported_distros(void)
+{
+    static char buf[128];
+    if (buf[0])
+        return buf;
+    for (size_t i = 0; i < sizeof(table) / sizeof(table[0]); i++) {
+        int dup = 0;
+        for (size_t j = 0; j < i; j++)
+            dup |= !strcmp(table[j].distro, table[i].distro);
+        if (dup)
+            continue;
+        size_t len = strlen(buf);
+        snprintf(buf + len, sizeof(buf) - len, "%s%s", len ? ", " : "", table[i].distro);
+    }
+    return buf;
 }
 
 void offsets_apply(const struct offset_entry *e, struct ros2ebpf_config *cfg)

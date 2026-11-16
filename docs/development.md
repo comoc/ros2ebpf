@@ -129,3 +129,4 @@ There are no release branches yet: the first one is created when the packages ar
 - `deploy-lint`: `deploy/k8s/sync.sh` must leave no diff, then validation of everything under `deploy/` (promtool on both Prometheus configs and the rules, amtool, kustomize, alloy fmt) and a build of the DaemonSet image (`docker/Dockerfile`).
 
 When a release branch is created, its workflow is a copy of the `rolling` job with the distro's `ros2dev` image, as in the other `fujitatomoya` repositories.
+The distro name lives in one place, `ROS2EBPF_DISTRO` in `ros2ebpf_daemon/src/offsets.h`; the CI script reads it from there (`ROS2EBPF_CI_DISTRO` overrides it), so a release branch changes that constant, the rows of `src/offsets.c` and `SUPPORTED_DISTROS` in `ros2ebpf/ros2ebpf/verb/doctor.py` ([offsets/README.md](../ros2ebpf_daemon/offsets/README.md)).

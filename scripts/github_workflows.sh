@@ -128,7 +128,7 @@ function check_rmw_offsets () {
     expected=$(sed -n "s/.*{ *\"${ROS_DISTRO}\", *\"${arch}\", *\([0-9]*\), *\([0-9]*\) *}.*/\1 \2/p" \
         src/ros2ebpf/ros2ebpf_daemon/src/offsets.c)
     local out
-    out=$(sh src/ros2ebpf/ros2ebpf_daemon/offsets/gen.sh "${COLCON_WORKSPACE}/install")
+    out=$(ROS2EBPF_DISTRO=${ROS_DISTRO} sh src/ros2ebpf/ros2ebpf_daemon/offsets/gen.sh "${COLCON_WORKSPACE}/install")
     echo "$out"
     local actual
     actual=$(echo "$out" | sed -n 's/.*{ *"[^"]*", *"[^"]*", *\([0-9]*\), *\([0-9]*\) *}.*/\1 \2/p')
@@ -303,8 +303,12 @@ function end_to_end () {
 
 export DEBIAN_FRONTEND=noninteractive
 export COLCON_WORKSPACE=/tmp/colcon_ws
-# rolling only (#15): the branch of ros2.repos, and the row of the offset table that is checked
-export ROS_DISTRO=rolling
+# The distro this branch follows (ROS2EBPF_DISTRO in ros2ebpf_daemon/src/offsets.h, rolling here, #15):
+# the branch of ros2.repos, and the row of the offset table that is checked. ROS2EBPF_CI_DISTRO
+# overrides it; the ros2dev image's own ROS_DISTRO does not.
+ROS_DISTRO=${ROS2EBPF_CI_DISTRO:-$(sed -n 's/^#define ROS2EBPF_DISTRO "\(.*\)"$/\1/p' "$(dirname "$0")/../ros2ebpf_daemon/src/offsets.h")}
+[ -n "${ROS_DISTRO}" ] || { echo "ROS2EBPF_DISTRO not found in ros2ebpf_daemon/src/offsets.h"; exit 1; }
+export ROS_DISTRO
 export ROS2EBPF_PACKAGES="ros2ebpf_exporter ros2ebpf_daemon ros2ebpf_interfaces ros2ebpf"
 
 # mark the working space root directory, so that we can come back anytime with `cd $there`

@@ -594,9 +594,11 @@ int main(int argc, char **argv)
         printf("config: %s ok\n", d.cfg.path);
         for (int i = 0; i < d.cfg.n_shims; i++) {
             char missing[512], distro[32];
-            if (offsets_distro_from_path(d.cfg.shims[i].path, distro, sizeof(distro)) == 0 &&
-                !offsets_lookup(distro, d.host_arch)) {
-                printf("shim %s: FAIL (ROS 2 %s: ros2ebpf follows Rolling only)\n", d.cfg.shims[i].path, distro);
+            const char *arch = d.cfg.shims[i].arch[0] ? d.cfg.shims[i].arch : d.host_arch;
+            offsets_resolve_distro(d.cfg.shims[i].path, distro, sizeof(distro));
+            if (!offsets_lookup(distro, arch)) {
+                printf("shim %s: FAIL (ROS 2 %s on %s: ros2ebpf supports ROS 2 %s)\n",
+                       d.cfg.shims[i].path, distro, arch, offsets_supported_distros());
                 bad = 1;
             } else if (offsets_check_shim(d.cfg.shims[i].path, missing, sizeof(missing))) {
                 printf("shim %s: FAIL (%s)\n", d.cfg.shims[i].path, missing);

@@ -1,20 +1,25 @@
 #!/bin/sh
-# Prints the struct offsets ros2ebpfd needs for the ROS 2 Rolling installation
-# on this machine, as the row of src/offsets.c for this architecture. CI runs
-# it against the mainline source build on every commit and fails when the row
-# in src/offsets.c differs (scripts/github_workflows.sh, check_rmw_offsets).
+# Prints the struct offsets ros2ebpfd needs for the ROS 2 installation on this
+# machine, as the row of src/offsets.c for this architecture. CI runs it against
+# the source build on every commit and fails when the row in src/offsets.c
+# differs (scripts/github_workflows.sh, check_rmw_offsets).
 #
-#   usage: gen.sh [/opt/ros/rolling | <colcon workspace>/install]
+#   usage: gen.sh [/opt/ros/<distro> | <colcon workspace>/install]
 #
+# The distro of the row is <distro> for /opt/ros/<distro>; for a workspace it is
+# $ROS2EBPF_DISTRO, default rolling (ROS2EBPF_DISTRO in src/offsets.h).
 # Requires a C compiler and the rmw headers of that installation, in the
-# merged layout (/opt/ros/rolling, or a workspace built with --merge-install).
+# merged layout (/opt/ros/<distro>, or a workspace built with --merge-install).
 set -e
-ROS_ROOT=${1:-/opt/ros/rolling}
+ROS_ROOT=${1:-/opt/ros/${ROS2EBPF_DISTRO:-rolling}}
 if [ ! -d "$ROS_ROOT/include" ]; then
-  echo "usage: $0 [/opt/ros/rolling | <colcon workspace>/install]" >&2
+  echo "usage: $0 [/opt/ros/<distro> | <colcon workspace>/install]" >&2
   exit 2
 fi
-DISTRO=rolling
+case "$ROS_ROOT" in
+  /opt/ros/*) DISTRO=$(echo "${ROS_ROOT#/opt/ros/}" | cut -d/ -f1) ;;
+  *) DISTRO=${ROS2EBPF_DISTRO:-rolling} ;;
+esac
 ARCH=$(uname -m)
 INC="-I$ROS_ROOT/include -I$ROS_ROOT/include/rmw -I$ROS_ROOT/include/rcutils -I$ROS_ROOT/include/rosidl_runtime_c -I$ROS_ROOT/include/rosidl_typesupport_interface -I$ROS_ROOT/include/rosidl_dynamic_typesupport"
 TMP=$(mktemp -d)
