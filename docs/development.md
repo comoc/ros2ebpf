@@ -118,7 +118,11 @@ Diffs then show the sentence that changed instead of a rewrapped paragraph.
 
 `rolling` is the default and development branch; pull requests target it.
 `main` is a read-only mirror of `rolling` (`.github/workflows/mirror-rolling-to-main.yaml` force-pushes it on every push to `rolling`, as the ROS 2 core repositories do), so `main` is never pushed to directly.
-There are no release branches yet: the first one is created when the packages are released into a ROS distro, and nothing is backported before that.
+`lyrical` is the release branch for ROS 2 Lyrical, branched from `rolling` after the distro was centralised in `ROS2EBPF_DISTRO` (#1); it supports Lyrical and Rolling.
+Changes land on `rolling` first and are backported with `git cherry-pick -x` in a pull request against `lyrical`:
+
+- always backport: bug fixes, and every update of the `rolling` rows of `src/offsets.c` (the rolling job of `lyrical` fails until it is);
+- do not backport: anything that needs a rcl / rmw / ros2cli API newer than Lyrical, and `rolling`-branch-only files (the Rolling-only CI, the mirror workflow).
 
 ## CI
 
