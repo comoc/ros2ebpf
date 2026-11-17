@@ -104,10 +104,16 @@ function install_build_dependencies () {
     rosdep update --rosdistro ${ROS_DISTRO}
     local paths
     paths=$(colcon list --paths-only --packages-up-to rmw ros2cli demo_nodes_cpp ${ROS2EBPF_PACKAGES})
-    # libbpf-dev and bpftool have no rosdep key yet; install_prerequisites installed them.
+    # Skipped keys: the packages under COLCON_IGNORE (setup_colcon_env), which rosdep would
+    # otherwise install as binaries (rmw_connextdds pulls RTI Connext, whose license prompt stops
+    # apt), and their vendored middlewares; libbpf-dev and bpftool have no rosdep key yet,
+    # install_prerequisites installed them.
+    local skip
+    skip="libbpf-dev bpftool $(find src -name COLCON_IGNORE -printf '%h\n' | while read -r d; do
+        find "$d" -name package.xml -exec sed -n 's|.*<name>\(.*\)</name>.*|\1|p' {} \; ; done | tr '\n' ' ')"
+    echo "rosdep skip keys: ${skip}"
     # shellcheck disable=SC2086  # one argument per path
-    rosdep install -y --rosdistro ${ROS_DISTRO} --ignore-src --from-paths ${paths} \
-        --skip-keys "libbpf-dev bpftool"
+    rosdep install -y --rosdistro ${ROS_DISTRO} --ignore-src --from-paths ${paths} --skip-keys "${skip}"
     cd $there
 }
 
