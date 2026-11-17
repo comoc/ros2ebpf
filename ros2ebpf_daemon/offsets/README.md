@@ -10,7 +10,8 @@
 These are ABI, not API.
 ros2ebpf follows ROS 2 Rolling only (#15), so `src/offsets.c` has one row per supported architecture, `rolling/x86_64` and `rolling/aarch64`.
 CI regenerates the values from the `rmw` headers of mainline on every commit (`check_rmw_offsets` in `scripts/github_workflows.sh`) and fails when the row is stale, and the daemon exports the row it uses as `ros2ebpf_host_info{offset_table="rolling/<arch>"}`.
-That checks the row of the runner's architecture, x86_64; there is no aarch64 runner, so the `offsets-aarch64` job runs `scripts/check_offsets_arch.sh aarch64` instead: `gen.sh` in the arm64 `ros:rolling-ros-base` image under qemu-user, which checks the `aarch64` rows against the released Rolling binaries (one sync behind mainline) and loads no BPF.
+That checks the row of the runner's architecture: `rolling/x86_64` in the `rolling` job, `rolling/aarch64` in the `arm64` job (an aarch64 runner, docs/development.md#ci).
+The `offsets-aarch64` job also runs `scripts/check_offsets_arch.sh aarch64`: `gen.sh` in the arm64 `ros:rolling-ros-base` image under qemu-user, which checks every `aarch64` row against the released binaries (one sync behind mainline) in a minute, without a source build.
 A shim under `/opt/ros/rolling/` or anywhere else (the `install/` of a source build) is Rolling; a shim under `/opt/ros/<other distro>/` is refused.
 The distro this branch follows is the one constant `ROS2EBPF_DISTRO` in `src/offsets.h`: the daemon (source builds, the default row), `gen.sh` (`ROS2EBPF_DISTRO` in the environment) and `scripts/github_workflows.sh` take it from there, and `SUPPORTED_DISTROS` of `ros2 ebpf doctor` is tested against the table.
 A distro branch changes that constant, the table and `SUPPORTED_DISTROS`.
