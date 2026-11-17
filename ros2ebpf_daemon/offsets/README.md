@@ -10,6 +10,7 @@
 These are ABI, not API.
 The `lyrical` branch supports ROS 2 Lyrical and Rolling, so `src/offsets.c` has one row per (distro, architecture): `lyrical/x86_64`, `lyrical/aarch64`, `rolling/x86_64`, `rolling/aarch64`.
 CI regenerates the values of both distros from their `rmw` headers on every commit (`check_rmw_offsets` in `scripts/github_workflows.sh`, one job per distro) and fails when a row is stale, and the daemon exports the row it uses as `ros2ebpf_host_info{offset_table="<distro>/<arch>"}`.
+That checks the rows of the runner's architecture, x86_64; there is no aarch64 runner, so the `offsets-aarch64` job runs `scripts/check_offsets_arch.sh aarch64` instead: `gen.sh` in the arm64 `ros:lyrical-ros-base` and `ros:rolling-ros-base` images under qemu-user, which checks the `aarch64` rows against the released Lyrical and Rolling binaries (one sync behind mainline) and loads no BPF.
 The distro of a shim is `shims[].distro` when the config sets it, else `<distro>` of `/opt/ros/<distro>/`, else Lyrical (the `install/` of a source build); any distro without a row is refused.
 A change of the `rolling` rows on the `rolling` branch is always backported here: the rolling job fails until it is.
 The distro this branch follows is the one constant `ROS2EBPF_DISTRO` in `src/offsets.h`: the daemon (source builds, the default row), `gen.sh` (`ROS2EBPF_DISTRO` in the environment) and `scripts/github_workflows.sh` take it from there, and `SUPPORTED_DISTROS` of `ros2 ebpf doctor` is tested against the table.
@@ -31,4 +32,5 @@ pub.topic_name=16
 ```
 
 Replace the row in `src/offsets.c` and rebuild.
+Without an aarch64 machine, `scripts/check_offsets_arch.sh aarch64` prints the aarch64 rows from the released binaries (needs docker and qemu binfmt: `docker run --privileged --rm tonistiigi/binfmt --install arm64`).
 `gen.sh` needs the merged layout: `/opt/ros/<distro>`, or a workspace built with `--merge-install`.
