@@ -20,8 +20,8 @@ jobs:
         distro: [lyrical, rolling]
     container:
       image: tomoyafujita/ros2dev:${{ matrix.distro }}
-      # privileged: bpffs mount + BPF program load. pid=host: the BPF programs report host-namespace
-      # pids, which the daemon resolves through /proc (same requirement as a containerised deployment).
+      # privileged: bpffs mount + BPF program load. pid=host: the daemon counts the processes of its
+      # pid namespace, the host's here (same requirement as a containerised deployment).
       options: --privileged --pid=host
     env:
       ROS2EBPF_CI_DISTRO: ${{ matrix.distro }}

@@ -25,7 +25,7 @@
 # this script should be adjusted accordingly, and `.github/workflows`
 # just calls this script in the workflow pipeline. The same script runs
 # locally (privileged for the BPF programs, host pid namespace so the daemon
-# can resolve the pids the BPF programs report, as in any containerised deployment):
+# sees the processes on the host, as in any containerised deployment):
 #
 #   docker run --rm --privileged --pid host -v "$PWD":/src:ro -w /src \
 #     tomoyafujita/ros2dev:lyrical ./scripts/github_workflows.sh
