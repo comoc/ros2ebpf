@@ -33,6 +33,31 @@ jobs:
         run: |
           ./scripts/github_workflows.sh
 
+  arm64:
+    # The same script on an aarch64 kernel: BPF objects through the arm64 verifier, uprobes on the
+    # arm64 librmw_implementation.so, the aarch64 offset rows against mainline, and the end-to-end
+    # test. ros2dev is amd64 only, so the job runs in ros:<distro>-ros-base and installs the build
+    # dependencies with rosdep (ROS2EBPF_CI_ROSDEP=1).
+    name: arm64 ${{ matrix.distro }} source build (same as above, on an aarch64 runner)
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [lyrical, rolling]
+    container:
+      image: ros:${{ matrix.distro }}-ros-base
+      options: --privileged --pid=host
+    env:
+      ROS2EBPF_CI_DISTRO: ${{ matrix.distro }}
+      ROS2EBPF_CI_ROSDEP: 1
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v7
+      - name: Build and test with ROS ${{ matrix.distro }} on aarch64
+        shell: bash
+        run: |
+          ./scripts/github_workflows.sh
+
   offsets-aarch64:
     # No aarch64 runner: the aarch64 rows of src/offsets.c are checked against the rmw headers of
     # the arm64 ros:<distro>-ros-base image under qemu-user (struct offsets only, no BPF).
