@@ -22,7 +22,11 @@ void config_defaults(struct config *c)
     c->read_environ = 1;
     c->default_domain_id = 0;
     c->probe_publish = c->probe_take = c->probe_services = c->probe_udp_drops = 1;
-    static const double b[] = { 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.5, 1 };
+    /* +-2 % around the common periods (1, 5, 10, 20, 33.3, 50, 100, 200, 500 ms, 1, 2 s), so that
+     * histogram_quantile() of a periodic topic lands inside a narrow bucket around its period. */
+    static const double b[] = { 0.0005, 0.00098, 0.00102, 0.0049, 0.0051, 0.0098, 0.0102, 0.0196, 0.0204,
+                                0.0327, 0.034, 0.049, 0.051, 0.098, 0.102, 0.196, 0.204, 0.49, 0.51,
+                                0.98, 1.02, 1.96, 2.04, 5, 10 };
     c->n_buckets = sizeof(b) / sizeof(b[0]);
     memcpy(c->buckets, b, sizeof(b));
     c->n_exclude = 2;
